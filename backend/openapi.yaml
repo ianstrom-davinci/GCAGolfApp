@@ -1,0 +1,641 @@
+openapi: 3.0.3
+info:
+  title: GCAGolfApp API
+  version: 1.0.0
+  description: API for collecting and retrieving golf launch monitor data.
+paths:
+  /api/golf/sessions/:
+    get:
+      operationId: api_golf_sessions_list
+      description: API endpoint that allows golf sessions to be viewed or edited.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGolfSessionList'
+          description: ''
+    post:
+      operationId: api_golf_sessions_create
+      description: API endpoint that allows golf sessions to be viewed or edited.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GolfSessionCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/GolfSessionCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/GolfSessionCreate'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GolfSessionCreate'
+          description: ''
+  /api/golf/sessions/{id}/:
+    get:
+      operationId: api_golf_sessions_retrieve
+      description: API endpoint that allows golf sessions to be viewed or edited.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this golf session.
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GolfSession'
+          description: ''
+    put:
+      operationId: api_golf_sessions_update
+      description: API endpoint that allows golf sessions to be viewed or edited.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this golf session.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GolfSessionCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/GolfSessionCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/GolfSessionCreate'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GolfSessionCreate'
+          description: ''
+    patch:
+      operationId: api_golf_sessions_partial_update
+      description: API endpoint that allows golf sessions to be viewed or edited.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this golf session.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedGolfSessionCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedGolfSessionCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedGolfSessionCreate'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GolfSessionCreate'
+          description: ''
+    delete:
+      operationId: api_golf_sessions_destroy
+      description: API endpoint that allows golf sessions to be viewed or edited.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this golf session.
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /api/golf/shots/:
+    get:
+      operationId: api_golf_shots_list
+      description: |-
+        API endpoint that allows individual shot data to be viewed or edited.
+        Supports filtering by session ID. E.g., /api/golf/shots/?session_id=1
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedShotDataList'
+          description: ''
+    post:
+      operationId: api_golf_shots_create
+      description: |-
+        API endpoint that allows individual shot data to be viewed or edited.
+        Supports filtering by session ID. E.g., /api/golf/shots/?session_id=1
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShotData'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ShotData'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ShotData'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShotData'
+          description: ''
+  /api/golf/shots/{id}/:
+    get:
+      operationId: api_golf_shots_retrieve
+      description: |-
+        API endpoint that allows individual shot data to be viewed or edited.
+        Supports filtering by session ID. E.g., /api/golf/shots/?session_id=1
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this shot data.
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShotData'
+          description: ''
+    put:
+      operationId: api_golf_shots_update
+      description: |-
+        API endpoint that allows individual shot data to be viewed or edited.
+        Supports filtering by session ID. E.g., /api/golf/shots/?session_id=1
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this shot data.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShotData'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ShotData'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ShotData'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShotData'
+          description: ''
+    patch:
+      operationId: api_golf_shots_partial_update
+      description: |-
+        API endpoint that allows individual shot data to be viewed or edited.
+        Supports filtering by session ID. E.g., /api/golf/shots/?session_id=1
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this shot data.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedShotData'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedShotData'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedShotData'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShotData'
+          description: ''
+    delete:
+      operationId: api_golf_shots_destroy
+      description: |-
+        API endpoint that allows individual shot data to be viewed or edited.
+        Supports filtering by session ID. E.g., /api/golf/shots/?session_id=1
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this shot data.
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+components:
+  schemas:
+    GolfSession:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        session_name:
+          type: string
+          nullable: true
+          description: Optional name for the session
+          maxLength: 100
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        shots:
+          type: array
+          items:
+            $ref: '#/components/schemas/ShotData'
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - shots
+    GolfSessionCreate:
+      type: object
+      properties:
+        session_name:
+          type: string
+          nullable: true
+          description: Optional name for the session
+          maxLength: 100
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+          nullable: true
+    PaginatedGolfSessionList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/GolfSession'
+    PaginatedShotDataList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ShotData'
+    PatchedGolfSessionCreate:
+      type: object
+      properties:
+        session_name:
+          type: string
+          nullable: true
+          description: Optional name for the session
+          maxLength: 100
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+          nullable: true
+    PatchedShotData:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        timestamp:
+          type: string
+          format: date-time
+        ball_speed:
+          type: number
+          format: double
+          nullable: true
+          description: mph or km/h
+        club_head_speed:
+          type: number
+          format: double
+          nullable: true
+          description: mph or km/h
+        launch_angle:
+          type: number
+          format: double
+          nullable: true
+          description: degrees
+        spin_rate:
+          type: number
+          format: double
+          nullable: true
+          description: rpm (backspin)
+        side_spin_rate:
+          type: number
+          format: double
+          nullable: true
+          description: rpm (positive for slice/fade, negative for hook/draw for RH
+            golfer)
+        carry_distance:
+          type: number
+          format: double
+          nullable: true
+          description: yards or meters
+        total_distance:
+          type: number
+          format: double
+          nullable: true
+          description: yards or meters
+        smash_factor:
+          type: number
+          format: double
+          nullable: true
+          description: Ball Speed / Club Head Speed
+        apex_height:
+          type: number
+          format: double
+          nullable: true
+          description: Peak height of ball trajectory in feet
+        lateral_deviation:
+          type: number
+          format: double
+          nullable: true
+          description: Distance offline from target in yards/meters (positive for
+            right, negative for left of target line)
+        attack_angle:
+          type: number
+          format: double
+          nullable: true
+          description: Angle of attack in degrees (positive for up, negative for down)
+        club_path:
+          type: number
+          format: double
+          nullable: true
+          description: Club path in degrees (positive for in-to-out, negative for
+            out-to-in)
+        face_angle:
+          type: number
+          format: double
+          nullable: true
+          description: Club face angle at impact in degrees (positive for open, negative
+            for closed, relative to target)
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        session:
+          type: integer
+          nullable: true
+    ShotData:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        timestamp:
+          type: string
+          format: date-time
+        ball_speed:
+          type: number
+          format: double
+          nullable: true
+          description: mph or km/h
+        club_head_speed:
+          type: number
+          format: double
+          nullable: true
+          description: mph or km/h
+        launch_angle:
+          type: number
+          format: double
+          nullable: true
+          description: degrees
+        spin_rate:
+          type: number
+          format: double
+          nullable: true
+          description: rpm (backspin)
+        side_spin_rate:
+          type: number
+          format: double
+          nullable: true
+          description: rpm (positive for slice/fade, negative for hook/draw for RH
+            golfer)
+        carry_distance:
+          type: number
+          format: double
+          nullable: true
+          description: yards or meters
+        total_distance:
+          type: number
+          format: double
+          nullable: true
+          description: yards or meters
+        smash_factor:
+          type: number
+          format: double
+          nullable: true
+          description: Ball Speed / Club Head Speed
+        apex_height:
+          type: number
+          format: double
+          nullable: true
+          description: Peak height of ball trajectory in feet
+        lateral_deviation:
+          type: number
+          format: double
+          nullable: true
+          description: Distance offline from target in yards/meters (positive for
+            right, negative for left of target line)
+        attack_angle:
+          type: number
+          format: double
+          nullable: true
+          description: Angle of attack in degrees (positive for up, negative for down)
+        club_path:
+          type: number
+          format: double
+          nullable: true
+          description: Club path in degrees (positive for in-to-out, negative for
+            out-to-in)
+        face_angle:
+          type: number
+          format: double
+          nullable: true
+          description: Club face angle at impact in degrees (positive for open, negative
+            for closed, relative to target)
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        session:
+          type: integer
+          nullable: true
+      required:
+      - created_at
+      - id
+      - updated_at
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid

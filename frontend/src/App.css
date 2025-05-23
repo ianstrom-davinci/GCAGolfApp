@@ -1,0 +1,106 @@
+﻿/* In frontend/src/App.css */
+
+/* Ensure html, body, and #root (if you use it) can expand */
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box; /* Apply box-sizing globally for easier layout */
+}
+
+*, *::before, *::after {
+  box-sizing: inherit; /* Make all elements inherit box-sizing */
+}
+
+.App {
+  text-align: center;
+  width: 100%; /* Ensure .App itself can take full width */
+  min-height: 100%; /* Ensure it takes at least full height */
+  display: flex;
+  flex-direction: column;
+}
+
+.App-header {
+  background-color: #ffffff; /* Changed to white */
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch; /* This should allow child elements like the table wrapper to take full width */
+  font-size: calc(10px + 2vmin);
+  color: #333333; /* Changed to dark grey text */
+  padding: 20px; /* Add some padding around the content */
+  width: 100%; /* Make App-header itself take full viewport width */
+}
+
+/* You can keep your other styles like .App-logo and animations if you have them */
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+
+.App-link {
+  color: #0066cc; /* Changed to a blue that works on light background */
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+button {
+  font-size: calc(8px + 2vmin);
+  padding: 10px 20px;
+  margin: 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  background-color: #007acc; /* Updated button color for light theme */
+  color: #ffffff; /* White text on colored buttons */
+  border: 1px solid #007acc;
+  transition: background-color 0.2s ease;
+}
+
+button:hover {
+  background-color: #005fa3; /* Darker on hover */
+}
+
+/* Delete button styling (keeping the red theme but adapted for light) */
+button[style*="background-color: #c0392b"] {
+  background-color: #dc3545 !important;
+  border-color: #dc3545 !important;
+}
+
+button[style*="background-color: #c0392b"]:hover {
+  background-color: #c82333 !important;
+}
+
+select {
+  font-size: calc(8px + 2vmin);
+  padding: 10px;
+  margin: 10px;
+  border-radius: 5px;
+  background-color: #ffffff; /* White background */
+  color: #333333; /* Dark grey text */
+  border: 1px solid #cccccc; /* Light grey border */
+}
+
+hr {
+  width: 80%; /* This hr is centered by default due to auto margins on block elements */
+  margin: 20px auto;
+  border-color: #e0e0e0; /* Light grey border for hr */
+}
+
+/* Styles for the table wrapper to ensure it can use the width */
+/* The div with style={{ width: '100%', overflowX: 'auto' }} in App.tsx
+   will be 100% of the width of App-header's content area.
+   With align-items: stretch on App-header, this div should now properly fill. */

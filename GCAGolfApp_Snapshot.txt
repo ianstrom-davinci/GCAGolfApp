@@ -1,0 +1,2689 @@
+# Project: GCAGolfApp Snapshot
+# Date: 05/16/2025 22:35:14
+# Project Root Path: C:\Users\IanStrom\DevelopmentProjects\GCAGolfApp
+
+# Project Goal Summary
+----------------------
+The GCAGolfApp is a web application designed to capture golf launch monitor metrics. 
+It uses OpenCV and Pytesseract (in a separate, future script) to parse a display screen, 
+extract numerical data (like ball speed, spin rate, launch angle, club head speed, 
+carry distance, total distance), and save this data to a PostgreSQL database. 
+The application features a Django backend API and a React frontend. 
+Users can create and delete sessions of golf shots, and view shot data in a sortable,
+resizable table. The current setup focuses on native Windows 11 deployment 
+without Docker, using Nginx as a web server.
+
+# ===================================
+# FILE CONTENTS
+# ===================================
+
+
+# File: backend\.env.backend.example
+# -----------------------------------
+# Django Settings
+SECRET_KEY=your_strong_secret_key_here
+DEBUG=True
+ALLOWED_HOSTS=localhost,127.0.0.1
+
+# Database Settings (PostgreSQL)
+DB_NAME=gcagolfapp_db
+DB_USER=gcagolfapp_user
+DB_PASSWORD=your_db_password
+DB_HOST=localhost
+DB_PORT=5432
+
+# Backend Server Port (for Waitress)
+BACKEND_SERVER_PORT=8000
+
+# -----------------------------------
+# END File: backend\.env.backend.example
+
+
+# File: backend\manage.py
+# ------------------------
+#!/usr/bin/env python
+"""Django's command-line utility for administrative tasks."""
+import os
+import sys
+
+
+def main():
+    """Run administrative tasks."""
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'gcagolfapp_backend.settings')
+    try:
+        from django.core.management import execute_from_command_line
+    except ImportError as exc:
+        raise ImportError(
+            "Couldn't import Django. Are you sure it's installed and "
+            "available on your PYTHONPATH environment variable? Did you "
+            "forget to activate a virtual environment?"
+        ) from exc
+    execute_from_command_line(sys.argv)
+
+
+if __name__ == '__main__':
+    main()
+
+# ------------------------
+# END File: backend\manage.py
+
+
+# File: backend\openapi.yaml
+# ---------------------------
+openapi: 3.0.3
+info:
+  title: GCAGolfApp API
+  version: 1.0.0
+  description: API for collecting and retrieving golf launch monitor data.
+paths:
+  /api/golf/sessions/:
+    get:
+      operationId: api_golf_sessions_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGolfSessionList'
+          description: ''
+    post:
+      operationId: api_golf_sessions_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GolfSessionCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/GolfSessionCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/GolfSessionCreate'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GolfSessionCreate'
+          description: ''
+  /api/golf/sessions/{id}/:
+    get:
+      operationId: api_golf_sessions_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this golf session.
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GolfSession'
+          description: ''
+    put:
+      operationId: api_golf_sessions_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this golf session.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GolfSessionCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/GolfSessionCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/GolfSessionCreate'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GolfSessionCreate'
+          description: ''
+    patch:
+      operationId: api_golf_sessions_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this golf session.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedGolfSessionCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedGolfSessionCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedGolfSessionCreate'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GolfSessionCreate'
+          description: ''
+    delete:
+      operationId: api_golf_sessions_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this golf session.
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /api/golf/shots/:
+    get:
+      operationId: api_golf_shots_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedShotDataList'
+          description: ''
+    post:
+      operationId: api_golf_shots_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShotData'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ShotData'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ShotData'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShotData'
+          description: ''
+  /api/golf/shots/{id}/:
+    get:
+      operationId: api_golf_shots_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this shot data.
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShotData'
+          description: ''
+    put:
+      operationId: api_golf_shots_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this shot data.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShotData'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ShotData'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ShotData'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShotData'
+          description: ''
+    patch:
+      operationId: api_golf_shots_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this shot data.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedShotData'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedShotData'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedShotData'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShotData'
+          description: ''
+    delete:
+      operationId: api_golf_shots_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this shot data.
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+components:
+  schemas:
+    GolfSession:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        session_name:
+          type: string
+          nullable: true
+          description: Optional name for the session
+          maxLength: 100
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        shots:
+          type: array
+          items:
+            $ref: '#/components/schemas/ShotData'
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - shots
+    GolfSessionCreate:
+      type: object
+      properties:
+        session_name:
+          type: string
+          nullable: true
+          description: Optional name for the session
+          maxLength: 100
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+          nullable: true
+    PaginatedGolfSessionList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/GolfSession'
+    PaginatedShotDataList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ShotData'
+    PatchedGolfSessionCreate:
+      type: object
+      properties:
+        session_name:
+          type: string
+          nullable: true
+          description: Optional name for the session
+          maxLength: 100
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+          nullable: true
+    PatchedShotData:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        timestamp:
+          type: string
+          format: date-time
+        ball_speed:
+          type: number
+          format: double
+          nullable: true
+          description: mph or km/h
+        club_head_speed:
+          type: number
+          format: double
+          nullable: true
+          description: mph or km/h
+        launch_angle:
+          type: number
+          format: double
+          nullable: true
+          description: degrees
+        spin_rate:
+          type: number
+          format: double
+          nullable: true
+          description: rpm
+        side_spin_rate:
+          type: number
+          format: double
+          nullable: true
+          description: rpm
+        carry_distance:
+          type: number
+          format: double
+          nullable: true
+          description: yards or meters
+        total_distance:
+          type: number
+          format: double
+          nullable: true
+          description: yards or meters
+        smash_factor:
+          type: number
+          format: double
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        session:
+          type: integer
+          nullable: true
+    ShotData:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        timestamp:
+          type: string
+          format: date-time
+        ball_speed:
+          type: number
+          format: double
+          nullable: true
+          description: mph or km/h
+        club_head_speed:
+          type: number
+          format: double
+          nullable: true
+          description: mph or km/h
+        launch_angle:
+          type: number
+          format: double
+          nullable: true
+          description: degrees
+        spin_rate:
+          type: number
+          format: double
+          nullable: true
+          description: rpm
+        side_spin_rate:
+          type: number
+          format: double
+          nullable: true
+          description: rpm
+        carry_distance:
+          type: number
+          format: double
+          nullable: true
+          description: yards or meters
+        total_distance:
+          type: number
+          format: double
+          nullable: true
+          description: yards or meters
+        smash_factor:
+          type: number
+          format: double
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        session:
+          type: integer
+          nullable: true
+      required:
+      - created_at
+      - id
+      - updated_at
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
+
+# ---------------------------
+# END File: backend\openapi.yaml
+
+
+# File: backend\requirements.txt
+# -------------------------------
+django~=4.2
+djangorestframework~=3.14
+psycopg2-binary~=2.9
+dj-database-url~=2.1
+python-dotenv~=1.0
+drf-spectacular~=0.27
+waitress~=2.1
+
+# -------------------------------
+# END File: backend\requirements.txt
+
+
+# File: backend\gcagolfapp_backend\__init__.py
+# ---------------------------------------------
+
+
+# ---------------------------------------------
+# END File: backend\gcagolfapp_backend\__init__.py
+
+
+# File: backend\gcagolfapp_backend\asgi.py
+# -----------------------------------------
+import os
+from django.core.asgi import get_asgi_application
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'gcagolfapp_backend.settings')
+application = get_asgi_application()
+
+# -----------------------------------------
+# END File: backend\gcagolfapp_backend\asgi.py
+
+
+# File: backend\gcagolfapp_backend\settings.py
+# ---------------------------------------------
+import os
+from pathlib import Path
+import dj_database_url
+from dotenv import load_dotenv
+
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from .env.backend
+ENV_FILE_PATH = BASE_DIR / '.env.backend'
+if ENV_FILE_PATH.exists():
+    load_dotenv(dotenv_path=ENV_FILE_PATH)
+else:
+    print(f"Warning: .env.backend file not found at {ENV_FILE_PATH}")
+
+SECRET_KEY = os.getenv('SECRET_KEY', 'fallback_secret_key_if_not_set_for_initial_commands')
+
+DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+
+ALLOWED_HOSTS_STRING = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1')
+ALLOWED_HOSTS = [host.strip() for host in ALLOWED_HOSTS_STRING.split(',') if host.strip()]
+
+# Application definition
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    'rest_framework',
+    'drf_spectacular',
+    'golf_metrics_app', # Your app
+]
+
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+]
+
+ROOT_URLCONF = 'gcagolfapp_backend.urls'
+
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
+]
+
+WSGI_APPLICATION = 'gcagolfapp_backend.wsgi.application'
+
+# Database
+DATABASES = {
+    'default': dj_database_url.config(
+        default=f"postgres://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}",
+        conn_max_age=600
+    )
+}
+if not DATABASES['default'].get('NAME'): # Check if DB_NAME was successfully loaded
+    # This basic check is for when .env might be missing or DB_NAME is empty.
+    # For a robust setup, you might raise an ImproperlyConfigured error.
+    print("WARNING: Database name (DB_NAME) is not configured. Check your .env.backend file.")
+    # Provide a minimal default to prevent crashes during initial manage.py commands if .env is missing
+    DATABASES['default']['NAME'] = 'please_configure_db_name'
+    DATABASES['default']['USER'] = 'please_configure_db_user'
+
+
+# Password validation
+AUTH_PASSWORD_VALIDATORS = [
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
+]
+
+# Internationalization
+LANGUAGE_CODE = 'en-us'
+TIME_ZONE = 'UTC'
+USE_I18N = True
+USE_TZ = True
+
+# Static files (CSS, JavaScript, Images)
+STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Media files
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'mediafiles'
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Django REST Framework Settings
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 10,
+}
+
+# drf-spectacular settings
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'GCAGolfApp API',
+    'DESCRIPTION': 'API for collecting and retrieving golf launch monitor data.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+}
+
+# ---------------------------------------------
+# END File: backend\gcagolfapp_backend\settings.py
+
+
+# File: backend\gcagolfapp_backend\urls.py
+# -----------------------------------------
+from django.contrib import admin
+from django.urls import path, include
+from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('api/golf/', include('golf_metrics_app.urls')), 
+
+    # OpenAPI Schema:
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    # Optional UI:
+    path('api/schema/swagger-ui/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('api/schema/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+]
+
+# -----------------------------------------
+# END File: backend\gcagolfapp_backend\urls.py
+
+
+# File: backend\gcagolfapp_backend\wsgi.py
+# -----------------------------------------
+import os
+from django.core.wsgi import get_wsgi_application
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'gcagolfapp_backend.settings')
+application = get_wsgi_application()
+
+# -----------------------------------------
+# END File: backend\gcagolfapp_backend\wsgi.py
+
+
+# File: backend\golf_metrics_app\__init__.py
+# -------------------------------------------
+
+
+# -------------------------------------------
+# END File: backend\golf_metrics_app\__init__.py
+
+
+# File: backend\golf_metrics_app\admin.py
+# ----------------------------------------
+from django.contrib import admin
+from .models import GolfSession, ShotData
+
+@admin.register(GolfSession)
+class GolfSessionAdmin(admin.ModelAdmin):
+    list_display = ('session_name', 'start_time', 'end_time', 'created_at')
+    search_fields = ('session_name',)
+
+@admin.register(ShotData)
+class ShotDataAdmin(admin.ModelAdmin):
+    list_display = (
+        'timestamp', 'session', 'ball_speed', 'club_head_speed',
+        'launch_angle', 'spin_rate', 'carry_distance', 'total_distance'
+    )
+    list_filter = ('session', 'timestamp')
+    search_fields = ('session__session_name',)
+    ordering = ('-timestamp',)
+
+# ----------------------------------------
+# END File: backend\golf_metrics_app\admin.py
+
+
+# File: backend\golf_metrics_app\apps.py
+# ---------------------------------------
+from django.apps import AppConfig
+
+class GolfMetricsAppConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'golf_metrics_app'
+
+# ---------------------------------------
+# END File: backend\golf_metrics_app\apps.py
+
+
+# File: backend\golf_metrics_app\models.py
+# -----------------------------------------
+from django.db import models
+from django.utils import timezone
+
+class GolfSession(models.Model):
+    session_name = models.CharField(max_length=100, blank=True, null=True, help_text="Optional name for the session")
+    start_time = models.DateTimeField(default=timezone.now)
+    end_time = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Session on {self.start_time.strftime('%Y-%m-%d %H:%M')}"
+
+class ShotData(models.Model):
+    session = models.ForeignKey(GolfSession, related_name='shots', on_delete=models.CASCADE, null=True, blank=True)
+    timestamp = models.DateTimeField(default=timezone.now)
+
+    ball_speed = models.FloatField(null=True, blank=True, help_text="mph or km/h")
+    club_head_speed = models.FloatField(null=True, blank=True, help_text="mph or km/h")
+    launch_angle = models.FloatField(null=True, blank=True, help_text="degrees")
+    spin_rate = models.FloatField(null=True, blank=True, help_text="rpm")
+    side_spin_rate = models.FloatField(null=True, blank=True, help_text="rpm")
+    carry_distance = models.FloatField(null=True, blank=True, help_text="yards or meters")
+    total_distance = models.FloatField(null=True, blank=True, help_text="yards or meters")
+    smash_factor = models.FloatField(null=True, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+        verbose_name_plural = "Shot Data"
+
+    def __str__(self):
+        return f"Shot at {self.timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
+
+# -----------------------------------------
+# END File: backend\golf_metrics_app\models.py
+
+
+# File: backend\golf_metrics_app\serializers.py
+# ----------------------------------------------
+from rest_framework import serializers
+from .models import GolfSession, ShotData
+
+class ShotDataSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ShotData
+        fields = '__all__' # You can list fields explicitly for more control
+        read_only_fields = ('id', 'created_at', 'updated_at')
+
+class GolfSessionSerializer(serializers.ModelSerializer):
+    shots = ShotDataSerializer(many=True, read_only=True) # Nested shots for GET requests
+
+    class Meta:
+        model = GolfSession
+        fields = ('id', 'session_name', 'start_time', 'end_time', 'created_at', 'shots')
+        read_only_fields = ('id', 'created_at')
+
+class GolfSessionCreateSerializer(serializers.ModelSerializer):
+    # This serializer is used for creating/updating sessions.
+    # 'id' is generated by the database and should not be sent in the POST/PUT request payload.
+    # By excluding 'id' from 'fields', it won't be expected in the request body.
+    class Meta:
+        model = GolfSession
+        fields = ('session_name', 'start_time', 'end_time') # 'id' is explicitly excluded here
+        # No need for read_only_fields = ('id',) if 'id' is not in the fields list for input.
+
+# ----------------------------------------------
+# END File: backend\golf_metrics_app\serializers.py
+
+
+# File: backend\golf_metrics_app\urls.py
+# ---------------------------------------
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import GolfSessionViewSet, ShotDataViewSet
+
+router = DefaultRouter()
+router.register(r'sessions', GolfSessionViewSet, basename='golfsession')
+router.register(r'shots', ShotDataViewSet, basename='shotdata')
+
+urlpatterns = [
+    path('', include(router.urls)),
+]
+
+# ---------------------------------------
+# END File: backend\golf_metrics_app\urls.py
+
+
+# File: backend\golf_metrics_app\views.py
+# ----------------------------------------
+from rest_framework import viewsets, status  # Ensure status is imported
+from rest_framework.response import Response  # Ensure Response is imported
+from .models import GolfSession, ShotData
+from .serializers import GolfSessionSerializer, GolfSessionCreateSerializer, ShotDataSerializer
+
+
+class GolfSessionViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows golf sessions to be viewed or edited.
+    """
+    queryset = GolfSession.objects.all().prefetch_related('shots').order_by('-start_time')
+
+    def get_serializer_class(self):
+        # This method determines which serializer to use based on the action.
+        # For 'create', 'update', 'partial_update', it uses GolfSessionCreateSerializer for INPUT VALIDATION.
+        # For other actions (like 'list', 'retrieve'), it uses GolfSessionSerializer for OUTPUT.
+        if self.action in ['create', 'update', 'partial_update']:
+            return GolfSessionCreateSerializer
+        return GolfSessionSerializer
+
+    # We are overriding the default 'create' action from CreateModelMixin
+    def create(self, request, *args, **kwargs):
+        # Get the serializer for INPUT data validation (this will be GolfSessionCreateSerializer)
+        input_serializer = self.get_serializer(data=request.data)
+        input_serializer.is_valid(raise_exception=True)
+
+        # perform_create saves the instance using the input_serializer.
+        # After this, input_serializer.instance will hold the newly created GolfSession object.
+        self.perform_create(input_serializer)
+
+        # Now, for the RESPONSE, we want to serialize the created instance
+        # using the main GolfSessionSerializer to include all fields, especially the 'id'.
+        output_serializer = GolfSessionSerializer(input_serializer.instance, context=self.get_serializer_context())
+
+        headers = self.get_success_headers(output_serializer.data)
+        return Response(output_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    # perform_create is called by create. It's good practice to keep it if you override create,
+    # as it simply calls serializer.save().
+    def perform_create(self, serializer):
+        serializer.save()
+
+
+class ShotDataViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows individual shot data to be viewed or edited.
+    Supports filtering by session ID. E.g., /api/golf/shots/?session_id=1
+    """
+    queryset = ShotData.objects.all().order_by('-timestamp')
+    serializer_class = ShotDataSerializer
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        session_id = self.request.query_params.get('session_id')
+        if session_id:
+            queryset = queryset.filter(session_id=session_id)
+        return queryset
+
+    # The default create for ShotDataViewSet should be fine as ShotDataSerializer includes all fields.
+    # def create(self, request, *args, **kwargs):
+    #     return super().create(request, *args, **kwargs)
+
+# ----------------------------------------
+# END File: backend\golf_metrics_app\views.py
+
+
+# File: backend\golf_metrics_app\migrations\0001_initial.py
+# ----------------------------------------------------------
+# Generated by Django 4.2.21 on 2025-05-17 02:26
+
+from django.db import migrations, models
+import django.db.models.deletion
+import django.utils.timezone
+
+
+class Migration(migrations.Migration):
+
+    initial = True
+
+    dependencies = [
+    ]
+
+    operations = [
+        migrations.CreateModel(
+            name='GolfSession',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('session_name', models.CharField(blank=True, help_text='Optional name for the session', max_length=100, null=True)),
+                ('start_time', models.DateTimeField(default=django.utils.timezone.now)),
+                ('end_time', models.DateTimeField(blank=True, null=True)),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+            ],
+        ),
+        migrations.CreateModel(
+            name='ShotData',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('timestamp', models.DateTimeField(default=django.utils.timezone.now)),
+                ('ball_speed', models.FloatField(blank=True, help_text='mph or km/h', null=True)),
+                ('club_head_speed', models.FloatField(blank=True, help_text='mph or km/h', null=True)),
+                ('launch_angle', models.FloatField(blank=True, help_text='degrees', null=True)),
+                ('spin_rate', models.FloatField(blank=True, help_text='rpm', null=True)),
+                ('side_spin_rate', models.FloatField(blank=True, help_text='rpm', null=True)),
+                ('carry_distance', models.FloatField(blank=True, help_text='yards or meters', null=True)),
+                ('total_distance', models.FloatField(blank=True, help_text='yards or meters', null=True)),
+                ('smash_factor', models.FloatField(blank=True, null=True)),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('updated_at', models.DateTimeField(auto_now=True)),
+                ('session', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='shots', to='golf_metrics_app.golfsession')),
+            ],
+            options={
+                'verbose_name_plural': 'Shot Data',
+                'ordering': ['-timestamp'],
+            },
+        ),
+    ]
+
+# ----------------------------------------------------------
+# END File: backend\golf_metrics_app\migrations\0001_initial.py
+
+
+# File: frontend\.env.frontend.example
+# -------------------------------------
+REACT_APP_API_BASE_URL=http://localhost/api
+# REACT_APP_API_BASE_URL_DEV=http://localhost:8000/api
+
+# -------------------------------------
+# END File: frontend\.env.frontend.example
+
+
+# File: frontend\package.json
+# ----------------------------
+{
+  "name": "gcagolfapp-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@tanstack/react-table": "^8.21.3",
+    "@testing-library/jest-dom": "^5.17.0",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "^13.5.0",
+    "@types/jest": "^27.5.2",
+    "@types/node": "^16.18.68",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "axios": "^1.6.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-scripts": "5.0.1",
+    "typescript": "^4.9.5",
+    "web-vitals": "^2.1.4"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "generate-api": "openapi-typescript ../backend/openapi.yaml --output src/api-client/gcagolfapp.ts"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "openapi-typescript": "^6.7.0"
+  }
+}
+
+# ----------------------------
+# END File: frontend\package.json
+
+
+# File: frontend\tsconfig.json
+# -----------------------------
+{
+  "compilerOptions": {
+    "target": "es5",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "module": "esnext",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx"
+  },
+  "include": [
+    "src"
+  ]
+}
+
+# -----------------------------
+# END File: frontend\tsconfig.json
+
+
+# File: frontend\public\index.html
+# ---------------------------------
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta
+      name="description"
+      content="GCAGolfApp - Golf Performance Tracker"
+    />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <title>GCAGolfApp</title>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+  </body>
+</html>
+
+# ---------------------------------
+# END File: frontend\public\index.html
+
+
+# File: frontend\public\logo192.png
+# ----------------------------------
+[Binary file: frontend\public\logo192.png - Content not included]
+# ----------------------------------
+# END File: frontend\public\logo192.png
+
+
+# File: frontend\public\manifest.json
+# ------------------------------------
+{
+  "short_name": "GCAGolfApp",
+  "name": "GCAGolfApp Golf Performance Tracker",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "logo192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "logo512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#000000",
+  "background_color": "#ffffff"
+}
+
+# ------------------------------------
+# END File: frontend\public\manifest.json
+
+
+# File: frontend\src\App.css
+# ---------------------------
+/* In frontend/src/App.css */
+
+/* Ensure html, body, and #root (if you use it) can expand */
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box; /* Apply box-sizing globally for easier layout */
+}
+
+*, *::before, *::after {
+  box-sizing: inherit; /* Make all elements inherit box-sizing */
+}
+
+.App {
+  text-align: center;
+  width: 100%; /* Ensure .App itself can take full width */
+  min-height: 100%; /* Ensure it takes at least full height */
+  display: flex;
+  flex-direction: column;
+}
+
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  /* CHANGED THIS LINE: from 'center' to 'stretch' */
+  align-items: stretch; /* This should allow child elements like the table wrapper to take full width */
+  font-size: calc(10px + 2vmin);
+  color: white;
+  padding: 20px; /* Add some padding around the content */
+  width: 100%; /* Make App-header itself take full viewport width */
+}
+
+/* You can keep your other styles like .App-logo and animations if you have them */
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+button {
+  font-size: calc(8px + 2vmin);
+  padding: 10px 20px;
+  margin: 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  background-color: #61dafb;
+  color: #282c34;
+  border: none;
+}
+
+button:hover {
+  background-color: #52b8d8;
+}
+
+select {
+  font-size: calc(8px + 2vmin);
+  padding: 10px;
+  margin: 10px;
+  border-radius: 5px;
+  background-color: #fff;
+  color: #282c34;
+}
+
+hr {
+  width: 80%; /* This hr is centered by default due to auto margins on block elements */
+  margin: 20px auto;
+  border-color: #444851;
+}
+
+/* Styles for the table wrapper to ensure it can use the width */
+/* The div with style={{ width: '100%', overflowX: 'auto' }} in App.tsx
+   will be 100% of the width of App-header's content area.
+   With align-items: stretch on App-header, this div should now properly fill. */
+
+# ---------------------------
+# END File: frontend\src\App.css
+
+
+# File: frontend\src\App.tsx
+# ---------------------------
+import React, { useEffect, useState } from 'react';
+import './App.css';
+import { components } from './api-client/gcagolfapp';
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  flexRender,
+  ColumnDef,
+  SortingState,
+  ColumnResizeMode,
+} from '@tanstack/react-table';
+
+// Define base URL for API calls
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost/api';
+
+// ApiClient type and implementation (remains the same)
+type ApiClient = {
+  getGolfSessions: () => Promise<components['schemas']['GolfSession'][] | undefined>;
+  createGolfSession: (data: components['schemas']['GolfSessionCreate']) => Promise<components['schemas']['GolfSession'] | undefined>;
+  deleteGolfSession: (sessionId: number) => Promise<boolean>;
+  getShotData: (sessionId?: number) => Promise<components['schemas']['ShotData'][] | undefined>;
+  createShotData: (data: Omit<components['schemas']['ShotData'], 'id' | 'created_at' | 'updated_at'>) => Promise<components['schemas']['ShotData'] | undefined>;
+};
+
+const apiClient: ApiClient = {
+  getGolfSessions: async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/golf/sessions/`);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json() as { results: components['schemas']['GolfSession'][] };
+      return data.results;
+    } catch (error) {
+      console.error("Failed to fetch golf sessions:", error);
+      return undefined;
+    }
+  },
+  createGolfSession: async (data) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/golf/sessions/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      return await response.json() as components['schemas']['GolfSession'];
+    } catch (error) {
+      console.error("Failed to create golf session:", error);
+      return undefined;
+    }
+  },
+  deleteGolfSession: async (sessionId: number) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/golf/sessions/${sessionId}/`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        if (response.status === 204) return true;
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return true;
+    } catch (error) {
+      console.error(`Failed to delete golf session ${sessionId}:`, error);
+      return false;
+    }
+  },
+  getShotData: async (sessionId?: number) => {
+    try {
+      const url = sessionId ? `${API_BASE_URL}/golf/shots/?session_id=${sessionId}` : `${API_BASE_URL}/golf/shots/`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json() as { results: components['schemas']['ShotData'][] };
+      return data.results;
+    } catch (error) {
+      console.error("Failed to fetch shot data:", error);
+      return undefined;
+    }
+  },
+  createShotData: async (data) => {
+     try {
+      const response = await fetch(`${API_BASE_URL}/golf/shots/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      return await response.json() as components['schemas']['ShotData'];
+    } catch (error) {
+      console.error("Failed to create shot data:", error);
+      return undefined;
+    }
+  }
+};
+
+type Shot = components['schemas']['ShotData'];
+
+function App() {
+  const [sessions, setSessions] = useState<components['schemas']['GolfSession'][]>([]);
+  const [shots, setShots] = useState<Shot[]>([]);
+  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnResizeMode, setColumnResizeMode] = useState<ColumnResizeMode>('onChange');
+
+
+  const columns = React.useMemo<ColumnDef<Shot>[]>(
+    () => [
+      {
+        accessorKey: 'timestamp',
+        header: 'Time',
+        cell: info => new Date(info.getValue<string>()).toLocaleString(),
+        size: 180,
+      },
+      {
+        accessorKey: 'ball_speed',
+        header: 'Ball Speed (mph)',
+        size: 150, // Adjusted default size
+      },
+      {
+        accessorKey: 'club_head_speed',
+        header: 'Club Speed (mph)',
+        size: 150, // Adjusted default size
+      },
+      {
+        accessorKey: 'launch_angle',
+        header: 'Launch (°)',
+        size: 120, // Adjusted default size
+      },
+      {
+        accessorKey: 'spin_rate',
+        header: 'Spin (rpm)',
+        size: 120, // Adjusted default size
+      },
+      {
+        accessorKey: 'carry_distance',
+        header: 'Carry (yds)',
+        size: 120, // Adjusted default size
+      },
+      {
+        accessorKey: 'total_distance',
+        header: 'Total (yds)',
+        size: 120, // Adjusted default size
+      },
+    ],
+    []
+  );
+
+  const table = useReactTable({
+    data: shots,
+    columns,
+    state: {
+      sorting,
+    },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    enableColumnResizing: true,
+    columnResizeMode,
+  });
+
+  // useEffect hooks and handler functions (handleCreateSession, handleDeleteSession, handleAddShot)
+    useEffect(() => {
+        const fetchData = async () => {
+          setLoading(true);
+          setError(null);
+          const fetchedSessions = await apiClient.getGolfSessions();
+          if (fetchedSessions) {
+            setSessions(fetchedSessions);
+            if (fetchedSessions.length > 0 && fetchedSessions[0].id != null) {
+               setSelectedSessionId(fetchedSessions[0].id);
+            } else {
+              setSelectedSessionId(null);
+            }
+          } else {
+            setError("Failed to load sessions.");
+          }
+          setLoading(false);
+        };
+        fetchData();
+      }, []);
+
+      useEffect(() => {
+        if (selectedSessionId !== null) {
+          const fetchShotsForSession = async () => {
+            setLoading(true);
+            setError(null);
+            const fetchedShots = await apiClient.getShotData(selectedSessionId);
+            if (fetchedShots) {
+              setShots(fetchedShots);
+            } else {
+              setError("Failed to load shots for the selected session.");
+              setShots([]);
+            }
+            setLoading(false);
+          };
+          fetchShotsForSession();
+        } else {
+          setShots([]);
+        }
+      }, [selectedSessionId]);
+
+      const handleCreateSession = async () => {
+        const newSessionName = prompt("Enter session name (optional):");
+        if (newSessionName === null) return;
+        const newSessionData: components['schemas']['GolfSessionCreate'] = {
+            session_name: newSessionName || `Session ${new Date().toLocaleTimeString()}`,
+            start_time: new Date().toISOString(),
+        };
+        const newSession = await apiClient.createGolfSession(newSessionData);
+        if (newSession && newSession.id != null) {
+            setSessions(prev => [newSession, ...prev]);
+            setSelectedSessionId(newSession.id);
+        } else {
+            alert("Failed to create session.");
+        }
+      };
+
+      const handleDeleteSession = async () => {
+        if (selectedSessionId === null) {
+          alert("No session selected to delete.");
+          return;
+        }
+        const currentSession = sessions.find(s => s.id === selectedSessionId);
+        if (!currentSession) return;
+        const confirmDelete = window.confirm(`Are you sure you want to delete session: "${currentSession.session_name || `ID ${currentSession.id}`}"? This will also delete all associated shots.`);
+        if (!confirmDelete) return;
+        const success = await apiClient.deleteGolfSession(selectedSessionId);
+        if (success) {
+          setSessions(prevSessions => prevSessions.filter(session => session.id !== selectedSessionId));
+          const remainingSessions = sessions.filter(session => session.id !== selectedSessionId);
+          if (remainingSessions.length > 0 && remainingSessions[0].id != null) {
+            setSelectedSessionId(remainingSessions[0].id);
+          } else {
+            setSelectedSessionId(null);
+          }
+          alert("Session deleted successfully.");
+        } else {
+          alert("Failed to delete session.");
+        }
+      };
+
+      const handleAddShot = async () => {
+        if (selectedSessionId === null) {
+            alert("Please select or create a session first.");
+            return;
+        }
+        const newShotData: Omit<components['schemas']['ShotData'], 'id' | 'created_at' | 'updated_at' | 'timestamp'> & { session?: number } = {
+            session: selectedSessionId,
+            ball_speed: parseFloat((Math.random() * 50 + 120).toFixed(1)),
+            club_head_speed: parseFloat((Math.random() * 30 + 90).toFixed(1)),
+            launch_angle: parseFloat((Math.random() * 10 + 8).toFixed(1)),
+            spin_rate: parseFloat((Math.random() * 1500 + 2000).toFixed(0)),
+            carry_distance: parseFloat((Math.random() * 100 + 150).toFixed(0)),
+            total_distance: parseFloat((Math.random() * 100 + 170).toFixed(0)),
+        };
+        const createdShot = await apiClient.createShotData(newShotData as any);
+        if (createdShot) {
+            setShots(prev => [createdShot, ...prev]);
+        } else {
+            alert("Failed to add shot.");
+        }
+      };
+
+  // Inline styles for the table
+  const tableStyle: React.CSSProperties = {
+    width: '100%', // Make the table try to use 100% of its container's width
+    minWidth: '800px', // Still ensure a minimum sensible width
+    margin: '20px 0',
+    borderCollapse: 'collapse',
+    fontSize: '0.9em',
+    color: '#ddd',
+    tableLayout: 'fixed',
+  };
+
+  const thStyleBase: React.CSSProperties = {
+    borderBottom: '2px solid #555',
+    padding: '10px 0px',
+    textAlign: 'left',
+    backgroundColor: '#3a3f47',
+    color: 'white',
+    position: 'relative',
+  };
+
+  const tdStyle: React.CSSProperties = {
+    border: '1px solid #444',
+    padding: '8px',
+    textAlign: 'left',
+  };
+
+  const resizeHandleStyle: React.CSSProperties = {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    height: '100%',
+    width: '5px',
+    background: 'rgba(255,255,255,0.1)',
+    cursor: 'col-resize',
+    userSelect: 'none',
+    touchAction: 'none',
+  };
+
+  const headerContentStyle: React.CSSProperties = {
+    paddingLeft: '8px',
+    paddingRight: '8px',
+    cursor: 'pointer',
+  };
+
+
+  if (loading && sessions.length === 0 && selectedSessionId === null) return <p>Loading sessions...</p>;
+  if (error) return <p style={{ color: 'red' }}>Error: {error}</p>;
+
+  return (
+    <div className="App">
+      <header className="App-header">
+        <h1>GCAGolfApp Dashboard</h1>
+        <div style={{ alignSelf: 'center', marginBottom: '10px' }}>  {/* Centering wrapper for buttons */}
+          <button onClick={handleCreateSession}>Create New Session</button>
+          {selectedSessionId !== null && sessions.some(s => s.id === selectedSessionId) && (
+            <button onClick={handleDeleteSession} style={{ backgroundColor: '#c0392b', color: 'white', marginLeft: '10px', border: 'none', padding: '10px 15px', borderRadius: '4px', cursor: 'pointer' }}>
+              Delete Selected Session
+            </button>
+          )}
+        </div>
+        <hr />
+        <h2 style={{ alignSelf: 'center' }}>Golf Sessions</h2> {/* Centering the heading */}
+        {sessions.length === 0 && !loading && <p style={{ alignSelf: 'center' }}>No sessions found. Create one!</p>}
+        {sessions.length > 0 && (
+          <select
+              style={{ alignSelf: 'center', marginBottom: '20px' }} /* Centering select */
+              value={selectedSessionId || ""}
+              onChange={(e) => setSelectedSessionId(parseInt(e.target.value))}
+          >
+              {selectedSessionId === null && <option value="" disabled>Select a session</option>}
+              {sessions.map((session) => (
+                  session.id != null &&
+                  <option key={session.id} value={session.id}>
+                      {session.session_name || `Session started at ${new Date(session.start_time!).toLocaleString()}`}
+                  </option>
+              ))}
+          </select>
+        )}
+
+        {/* This div is key for table width and scrolling */}
+        {selectedSessionId !== null && sessions.some(s => s.id === selectedSessionId) && (
+            <div style={{ width: '100%', overflowX: 'auto', marginTop: '20px' }}>
+                <h3 style={{ textAlign: 'center' }}>Shots for Session: {sessions.find(s => s.id === selectedSessionId)?.session_name || `ID ${selectedSessionId}`}</h3>
+                <div style={{ textAlign: 'center', marginBottom: '10px' }}> {/* Centering Add Dummy Shot button */}
+                  <button onClick={handleAddShot}>Add Dummy Shot</button>
+                </div>
+
+                {loading && shots.length === 0 && <p style={{ textAlign: 'center' }}>Loading shots for session...</p>}
+                {!loading && shots.length === 0 && <p style={{ textAlign: 'center' }}>No shots recorded for this session yet.</p>}
+
+                {shots.length > 0 && (
+                  <table style={tableStyle}> {/* Removed dynamic width: table.getTotalSize() */}
+                    <thead>
+                      {table.getHeaderGroups().map(headerGroup => (
+                        <tr key={headerGroup.id}>
+                          {headerGroup.headers.map(header => (
+                            <th
+                              key={header.id}
+                              style={{...thStyleBase, width: header.getSize() }}
+                            >
+                              <div
+                                onClick={header.column.getToggleSortingHandler()}
+                                style={headerContentStyle}
+                                title="Click to sort"
+                              >
+                                {header.isPlaceholder
+                                  ? null
+                                  : flexRender(
+                                      header.column.columnDef.header,
+                                      header.getContext()
+                                    )}
+                                {{
+                                  asc: ' 🔼',
+                                  desc: ' 🔽',
+                                }[header.column.getIsSorted() as string] ?? null}
+                              </div>
+
+                              <div
+                                {...{
+                                  onMouseDown: header.getResizeHandler(),
+                                  onTouchStart: header.getResizeHandler(),
+                                  style: resizeHandleStyle,
+                                  className: `resizer ${header.column.getIsResizing() ? 'isResizing' : ''}`,
+                                }}
+                              />
+                            </th>
+                          ))}
+                        </tr>
+                      ))}
+                    </thead>
+                    <tbody>
+                      {table.getRowModel().rows.map(row => (
+                        <tr key={row.id}>
+                          {row.getVisibleCells().map(cell => (
+                            <td
+                              key={cell.id}
+                              style={{ ...tdStyle, width: cell.column.getSize() }}
+                            >
+                              {flexRender(
+                                cell.column.columnDef.cell,
+                                cell.getContext()
+                              )}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+            </div>
+        )}
+      </header>
+    </div>
+  );
+}
+
+export default App;
+
+# ---------------------------
+# END File: frontend\src\App.tsx
+
+
+# File: frontend\src\index.css
+# -----------------------------
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+# -----------------------------
+# END File: frontend\src\index.css
+
+
+# File: frontend\src\index.tsx
+# -----------------------------
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import './index.css'; // You'll need to create this
+import App from './App';
+import reportWebVitals from './reportWebVitals'; // You'll need to create this
+
+const root = ReactDOM.createRoot(
+  document.getElementById('root') as HTMLElement
+);
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+
+// If you want to start measuring performance in your app, pass a function
+// to log results (for example: reportWebVitals(console.log))
+// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
+reportWebVitals();
+
+# -----------------------------
+# END File: frontend\src\index.tsx
+
+
+# File: frontend\src\reportWebVitals.ts
+# --------------------------------------
+import { ReportHandler } from 'web-vitals';
+
+const reportWebVitals = (onPerfEntry?: ReportHandler) => {
+  if (onPerfEntry && onPerfEntry instanceof Function) {
+    import('web-vitals').then(({ getCLS, getFID, getFCP, getLCP, getTTFB }) => {
+      getCLS(onPerfEntry);
+      getFID(onPerfEntry);
+      getFCP(onPerfEntry);
+      getLCP(onPerfEntry);
+      getTTFB(onPerfEntry);
+    });
+  }
+};
+
+export default reportWebVitals;
+
+# --------------------------------------
+# END File: frontend\src\reportWebVitals.ts
+
+
+# File: frontend\src\api-client\gcagolfapp.ts
+# --------------------------------------------
+/**
+ * This file was auto-generated by openapi-typescript.
+ * Do not make direct changes to the file.
+ */
+
+
+export interface paths {
+  "/api/golf/sessions/": {
+    get: operations["api_golf_sessions_list"];
+    post: operations["api_golf_sessions_create"];
+  };
+  "/api/golf/sessions/{id}/": {
+    get: operations["api_golf_sessions_retrieve"];
+    put: operations["api_golf_sessions_update"];
+    delete: operations["api_golf_sessions_destroy"];
+    patch: operations["api_golf_sessions_partial_update"];
+  };
+  "/api/golf/shots/": {
+    get: operations["api_golf_shots_list"];
+    post: operations["api_golf_shots_create"];
+  };
+  "/api/golf/shots/{id}/": {
+    get: operations["api_golf_shots_retrieve"];
+    put: operations["api_golf_shots_update"];
+    delete: operations["api_golf_shots_destroy"];
+    patch: operations["api_golf_shots_partial_update"];
+  };
+}
+
+export type webhooks = Record<string, never>;
+
+export interface components {
+  schemas: {
+    GolfSession: {
+      id: number;
+      /** @description Optional name for the session */
+      session_name?: string | null;
+      /** Format: date-time */
+      start_time?: string;
+      /** Format: date-time */
+      end_time?: string | null;
+      /** Format: date-time */
+      created_at: string;
+      shots: readonly components["schemas"]["ShotData"][];
+    };
+    GolfSessionCreate: {
+      /** @description Optional name for the session */
+      session_name?: string | null;
+      /** Format: date-time */
+      start_time?: string;
+      /** Format: date-time */
+      end_time?: string | null;
+    };
+    PaginatedGolfSessionList: {
+      /** @example 123 */
+      count: number;
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null;
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null;
+      results: components["schemas"]["GolfSession"][];
+    };
+    PaginatedShotDataList: {
+      /** @example 123 */
+      count: number;
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=4
+       */
+      next?: string | null;
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?page=2
+       */
+      previous?: string | null;
+      results: components["schemas"]["ShotData"][];
+    };
+    PatchedGolfSessionCreate: {
+      /** @description Optional name for the session */
+      session_name?: string | null;
+      /** Format: date-time */
+      start_time?: string;
+      /** Format: date-time */
+      end_time?: string | null;
+    };
+    PatchedShotData: {
+      id?: number;
+      /** Format: date-time */
+      timestamp?: string;
+      /**
+       * Format: double
+       * @description mph or km/h
+       */
+      ball_speed?: number | null;
+      /**
+       * Format: double
+       * @description mph or km/h
+       */
+      club_head_speed?: number | null;
+      /**
+       * Format: double
+       * @description degrees
+       */
+      launch_angle?: number | null;
+      /**
+       * Format: double
+       * @description rpm
+       */
+      spin_rate?: number | null;
+      /**
+       * Format: double
+       * @description rpm
+       */
+      side_spin_rate?: number | null;
+      /**
+       * Format: double
+       * @description yards or meters
+       */
+      carry_distance?: number | null;
+      /**
+       * Format: double
+       * @description yards or meters
+       */
+      total_distance?: number | null;
+      /** Format: double */
+      smash_factor?: number | null;
+      /** Format: date-time */
+      created_at?: string;
+      /** Format: date-time */
+      updated_at?: string;
+      session?: number | null;
+    };
+    ShotData: {
+      id: number;
+      /** Format: date-time */
+      timestamp?: string;
+      /**
+       * Format: double
+       * @description mph or km/h
+       */
+      ball_speed?: number | null;
+      /**
+       * Format: double
+       * @description mph or km/h
+       */
+      club_head_speed?: number | null;
+      /**
+       * Format: double
+       * @description degrees
+       */
+      launch_angle?: number | null;
+      /**
+       * Format: double
+       * @description rpm
+       */
+      spin_rate?: number | null;
+      /**
+       * Format: double
+       * @description rpm
+       */
+      side_spin_rate?: number | null;
+      /**
+       * Format: double
+       * @description yards or meters
+       */
+      carry_distance?: number | null;
+      /**
+       * Format: double
+       * @description yards or meters
+       */
+      total_distance?: number | null;
+      /** Format: double */
+      smash_factor?: number | null;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+      session?: number | null;
+    };
+  };
+  responses: never;
+  parameters: never;
+  requestBodies: never;
+  headers: never;
+  pathItems: never;
+}
+
+export type $defs = Record<string, never>;
+
+export type external = Record<string, never>;
+
+export interface operations {
+
+  api_golf_sessions_list: {
+    parameters: {
+      query?: {
+        /** @description A page number within the paginated result set. */
+        page?: number;
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["PaginatedGolfSessionList"];
+        };
+      };
+    };
+  };
+  api_golf_sessions_create: {
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["GolfSessionCreate"];
+        "application/x-www-form-urlencoded": components["schemas"]["GolfSessionCreate"];
+        "multipart/form-data": components["schemas"]["GolfSessionCreate"];
+      };
+    };
+    responses: {
+      201: {
+        content: {
+          "application/json": components["schemas"]["GolfSessionCreate"];
+        };
+      };
+    };
+  };
+  api_golf_sessions_retrieve: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this golf session. */
+        id: number;
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["GolfSession"];
+        };
+      };
+    };
+  };
+  api_golf_sessions_update: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this golf session. */
+        id: number;
+      };
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["GolfSessionCreate"];
+        "application/x-www-form-urlencoded": components["schemas"]["GolfSessionCreate"];
+        "multipart/form-data": components["schemas"]["GolfSessionCreate"];
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["GolfSessionCreate"];
+        };
+      };
+    };
+  };
+  api_golf_sessions_destroy: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this golf session. */
+        id: number;
+      };
+    };
+    responses: {
+      /** @description No response body */
+      204: {
+        content: never;
+      };
+    };
+  };
+  api_golf_sessions_partial_update: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this golf session. */
+        id: number;
+      };
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["PatchedGolfSessionCreate"];
+        "application/x-www-form-urlencoded": components["schemas"]["PatchedGolfSessionCreate"];
+        "multipart/form-data": components["schemas"]["PatchedGolfSessionCreate"];
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["GolfSessionCreate"];
+        };
+      };
+    };
+  };
+  api_golf_shots_list: {
+    parameters: {
+      query?: {
+        /** @description A page number within the paginated result set. */
+        page?: number;
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["PaginatedShotDataList"];
+        };
+      };
+    };
+  };
+  api_golf_shots_create: {
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["ShotData"];
+        "application/x-www-form-urlencoded": components["schemas"]["ShotData"];
+        "multipart/form-data": components["schemas"]["ShotData"];
+      };
+    };
+    responses: {
+      201: {
+        content: {
+          "application/json": components["schemas"]["ShotData"];
+        };
+      };
+    };
+  };
+  api_golf_shots_retrieve: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this shot data. */
+        id: number;
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["ShotData"];
+        };
+      };
+    };
+  };
+  api_golf_shots_update: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this shot data. */
+        id: number;
+      };
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["ShotData"];
+        "application/x-www-form-urlencoded": components["schemas"]["ShotData"];
+        "multipart/form-data": components["schemas"]["ShotData"];
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["ShotData"];
+        };
+      };
+    };
+  };
+  api_golf_shots_destroy: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this shot data. */
+        id: number;
+      };
+    };
+    responses: {
+      /** @description No response body */
+      204: {
+        content: never;
+      };
+    };
+  };
+  api_golf_shots_partial_update: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this shot data. */
+        id: number;
+      };
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["PatchedShotData"];
+        "application/x-www-form-urlencoded": components["schemas"]["PatchedShotData"];
+        "multipart/form-data": components["schemas"]["PatchedShotData"];
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["ShotData"];
+        };
+      };
+    };
+  };
+}
+
+# --------------------------------------------
+# END File: frontend\src\api-client\gcagolfapp.ts
+
+
+# File: nginx\conf\mime.types
+# ----------------------------
+
+types {
+    text/html                                        html htm shtml;
+    text/css                                         css;
+    text/xml                                         xml;
+    image/gif                                        gif;
+    image/jpeg                                       jpeg jpg;
+    application/javascript                           js;
+    application/atom+xml                             atom;
+    application/rss+xml                              rss;
+
+    text/mathml                                      mml;
+    text/plain                                       txt;
+    text/vnd.sun.j2me.app-descriptor                 jad;
+    text/vnd.wap.wml                                 wml;
+    text/x-component                                 htc;
+
+    image/avif                                       avif;
+    image/png                                        png;
+    image/svg+xml                                    svg svgz;
+    image/tiff                                       tif tiff;
+    image/vnd.wap.wbmp                               wbmp;
+    image/webp                                       webp;
+    image/x-icon                                     ico;
+    image/x-jng                                      jng;
+    image/x-ms-bmp                                   bmp;
+
+    font/woff                                        woff;
+    font/woff2                                       woff2;
+
+    application/java-archive                         jar war ear;
+    application/json                                 json;
+    application/mac-binhex40                         hqx;
+    application/msword                               doc;
+    application/pdf                                  pdf;
+    application/postscript                           ps eps ai;
+    application/rtf                                  rtf;
+    application/vnd.apple.mpegurl                    m3u8;
+    application/vnd.google-earth.kml+xml             kml;
+    application/vnd.google-earth.kmz                 kmz;
+    application/vnd.ms-excel                         xls;
+    application/vnd.ms-fontobject                    eot;
+    application/vnd.ms-powerpoint                    ppt;
+    application/vnd.oasis.opendocument.graphics      odg;
+    application/vnd.oasis.opendocument.presentation  odp;
+    application/vnd.oasis.opendocument.spreadsheet   ods;
+    application/vnd.oasis.opendocument.text          odt;
+    application/vnd.openxmlformats-officedocument.presentationml.presentation
+                                                     pptx;
+    application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+                                                     xlsx;
+    application/vnd.openxmlformats-officedocument.wordprocessingml.document
+                                                     docx;
+    application/vnd.wap.wmlc                         wmlc;
+    application/wasm                                 wasm;
+    application/x-7z-compressed                      7z;
+    application/x-cocoa                              cco;
+    application/x-java-archive-diff                  jardiff;
+    application/x-java-jnlp-file                     jnlp;
+    application/x-makeself                           run;
+    application/x-perl                               pl pm;
+    application/x-pilot                              prc pdb;
+    application/x-rar-compressed                     rar;
+    application/x-redhat-package-manager             rpm;
+    application/x-sea                                sea;
+    application/x-shockwave-flash                    swf;
+    application/x-stuffit                            sit;
+    application/x-tcl                                tcl tk;
+    application/x-x509-ca-cert                       der pem crt;
+    application/x-xpinstall                          xpi;
+    application/xhtml+xml                            xhtml;
+    application/xspf+xml                             xspf;
+    application/zip                                  zip;
+
+    application/octet-stream                         bin exe dll;
+    application/octet-stream                         deb;
+    application/octet-stream                         dmg;
+    application/octet-stream                         iso img;
+    application/octet-stream                         msi msp msm;
+
+    audio/midi                                       mid midi kar;
+    audio/mpeg                                       mp3;
+    audio/ogg                                        ogg;
+    audio/x-m4a                                      m4a;
+    audio/x-realaudio                                ra;
+
+    video/3gpp                                       3gpp 3gp;
+    video/mp2t                                       ts;
+    video/mp4                                        mp4;
+    video/mpeg                                       mpeg mpg;
+    video/quicktime                                  mov;
+    video/webm                                       webm;
+    video/x-flv                                      flv;
+    video/x-m4v                                      m4v;
+    video/x-mng                                      mng;
+    video/x-ms-asf                                   asx asf;
+    video/x-ms-wmv                                   wmv;
+    video/x-msvideo                                  avi;
+}
+
+# ----------------------------
+# END File: nginx\conf\mime.types
+
+
+# File: nginx\conf\nginx.conf
+# ----------------------------
+# nginx.conf for GCAGolfApp
+
+# Defines the user and group Nginx will run as.
+# On Windows, this is less critical but good practice to keep.
+# user  nobody;
+
+# The number of worker processes. Should generally be equal to the number of CPU cores.
+worker_processes  1;
+
+# Error log location and verbosity.
+# This global error log will capture issues before a server block is processed.
+# Ensure C:/Users/ianstrom/DevelopmentProjects/GCAGolfApp/nginx/logs/ directory exists.
+error_log  C:/Users/ianstrom/DevelopmentProjects/GCAGolfApp/nginx/logs/error.log warn;
+
+# File containing the process ID of the main Nginx process.
+pid        C:/Users/ianstrom/DevelopmentProjects/GCAGolfApp/nginx/logs/nginx.pid;
+
+events {
+    # Max number of simultaneous connections that can be opened by a worker process.
+    worker_connections  1024;
+}
+
+http {
+    # Includes a file defining MIME types of files.
+    include       mime.types;
+    # Default MIME type for files if not otherwise specified.
+    default_type  application/octet-stream;
+
+    # Log format definition. 'main' is a common name for a standard format.
+    log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
+
+    # Default access log for all server blocks if not specified within them.
+    # Ensure C:/Users/ianstrom/DevelopmentProjects/GCAGolfApp/nginx/logs/ directory exists.
+    access_log  C:/Users/ianstrom/DevelopmentProjects/GCAGolfApp/nginx/logs/access.log  main;
+
+    # Optimizes file sending.
+    sendfile        on;
+    # Allows Nginx to send HTTP response headers and the beginning of a file in one packet.
+    # tcp_nopush     on;
+
+    # Timeout for keep-alive connections with the client.
+    keepalive_timeout  65;
+
+    # Enables or disables gzip compression.
+    # gzip  on;
+
+    # Defines the upstream group for the Django backend application server (Waitress).
+    upstream django_backend {
+        # Address and port where Waitress (or your Django app server) is running.
+        # This should match BACKEND_SERVER_PORT in your backend/.env.backend file.
+        server 127.0.0.1:8000;
+    }
+
+    # Defines a virtual server.
+    server {
+        # Port Nginx will listen on for this server block. 80 is standard HTTP.
+        listen       80;
+        # Server name(s) for this block. 'localhost' is for local access.
+        server_name  localhost;
+
+        # Character set for responses.
+        # charset utf-8;
+
+        # Per-server access and error logs (optional if global ones are sufficient).
+        # These will also go into the logs directory we created.
+        # access_log  C:/Users/ianstrom/DevelopmentProjects/GCAGolfApp/nginx/logs/gcagolfapp.server.access.log main;
+        # error_log   C:/Users/ianstrom/DevelopmentProjects/GCAGolfApp/nginx/logs/gcagolfapp.server.error.log warn;
+
+        # Location block for API requests.
+        # All requests starting with /api/ will be proxied to the Django backend.
+        location /api/ {
+            proxy_pass http://django_backend; # Forwards request to the 'django_backend' upstream group.
+            # Sets headers to pass information about the original request to the backend.
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Host $host;
+            proxy_redirect off; # Prevents Nginx from rewriting redirects from the backend.
+            proxy_buffering off; # Useful for streaming responses or long polling.
+        }
+
+        # Location block for Django admin static files.
+        # This is used if you run `python manage.py collectstatic` for the Django admin interface.
+        # The alias directive maps this URL path to a filesystem path.
+        # STATIC_ROOT in settings.py is 'backend/staticfiles'.
+        location /static_admin/ {
+            alias C:/Users/ianstrom/DevelopmentProjects/GCAGolfApp/backend/staticfiles/;
+        }
+
+        # Location block for serving the static React frontend assets.
+        # This is the default block if no other location matches.
+        location / {
+            # Root directory from which to serve frontend files.
+            # This should point to your React app's build output directory.
+            root   C:/Users/ianstrom/DevelopmentProjects/GCAGolfApp/frontend/build;
+            # For Single Page Applications (SPAs), tries to serve the requested file/directory.
+            # If not found, it serves /index.html, allowing React Router to handle routing.
+            try_files $uri $uri/ /index.html;
+            # Caching control for development. Tells browser not to cache.
+            add_header Cache-Control "no-cache";
+        }
+
+        # Custom error pages (optional).
+        # error_page   500 502 503 504  /50x.html;
+        # location = /50x.html {
+        #     root   html; # Nginx's default html directory
+        # }
+    }
+
+    # Another server block for HTTPS could be added here later.
+    # server {
+    #     listen       443 ssl;
+    #     server_name  localhost;
+    #
+    #     ssl_certificate      cert.pem;
+    #     ssl_certificate_key  key.pem;
+    #
+    #     # ... other SSL settings ...
+    #
+    #     location / {
+    #         # ... same as HTTP location / ...
+    #     }
+    # }
+}
+
+# ----------------------------
+# END File: nginx\conf\nginx.conf
+
+
+# File: scripts\build_frontend.ps1
+# ---------------------------------
+# build_frontend.ps1
+$ProjectRoot = $PSScriptRoot | Split-Path
+$FrontendPath = Join-Path -Path $ProjectRoot -ChildPath "frontend"
+if (-not (Test-Path (Join-Path $FrontendPath "package.json"))) { Write-Error "package.json not found in $FrontendPath"; exit 1 }
+Write-Host "Building React frontend..."
+Push-Location $FrontendPath
+npm run build
+Pop-Location
+Write-Host "Frontend build complete in frontend\build."
+Read-Host -Prompt "Press Enter to exit"
+
+# ---------------------------------
+# END File: scripts\build_frontend.ps1
+
+
+# File: scripts\generate_api_client.ps1
+# --------------------------------------
+# generate_api_client.ps1
+$ProjectRoot = $PSScriptRoot | Split-Path
+$VenvPath = Join-Path -Path $ProjectRoot -ChildPath "venv_backend\Scripts\Activate.ps1"
+$BackendPath = Join-Path -Path $ProjectRoot -ChildPath "backend"
+$FrontendPath = Join-Path -Path $ProjectRoot -ChildPath "frontend"
+$OpenApiFile = Join-Path -Path $BackendPath -ChildPath "openapi.yaml"
+
+if (-not (Test-Path $VenvPath)) { Write-Error "Backend venv not found: $VenvPath"; exit 1 }
+Write-Host "Activating backend venv..."
+& $VenvPath
+Write-Host "Generating OpenAPI schema (openapi.yaml)..."
+Push-Location $BackendPath
+python manage.py spectacular --color --file $OpenApiFile
+if ($LASTEXITCODE -ne 0) { Write-Error "Failed to generate OpenAPI schema."; Pop-Location; exit 1 }
+Pop-Location
+Write-Host "OpenAPI schema generated: $OpenApiFile"
+
+if (-not (Test-Path (Join-Path $FrontendPath "package.json"))) { Write-Error "frontend package.json not found"; exit 1 }
+Write-Host "Generating TypeScript API client for frontend..."
+Push-Location $FrontendPath
+npm run generate-api
+if ($LASTEXITCODE -ne 0) { Write-Error "Failed to generate frontend API client."; Pop-Location; exit 1 }
+Pop-Location
+Write-Host "API client generation complete."
+Read-Host -Prompt "Press Enter to exit"
+
+# --------------------------------------
+# END File: scripts\generate_api_client.ps1
+
+
+# File: scripts\run_migrations.ps1
+# ---------------------------------
+# run_migrations.ps1
+$ProjectRoot = $PSScriptRoot | Split-Path
+$VenvPath = Join-Path -Path $ProjectRoot -ChildPath "venv_backend\Scripts\Activate.ps1"
+$BackendPath = Join-Path -Path $ProjectRoot -ChildPath "backend"
+if (-not (Test-Path $VenvPath)) { Write-Error "Venv not found: $VenvPath"; exit 1 }
+Write-Host "Activating venv..."
+& $VenvPath
+Write-Host "Running Django makemigrations and migrate..."
+Push-Location $BackendPath
+python manage.py makemigrations golf_metrics_app
+python manage.py migrate
+Pop-Location
+Write-Host "Migrations complete."
+Read-Host -Prompt "Press Enter to exit"
+
+# ---------------------------------
+# END File: scripts\run_migrations.ps1
+
+
+# File: scripts\setup_env_files.ps1
+# ----------------------------------
+# setup_env_files.ps1
+$ProjectRoot = $PSScriptRoot | Split-Path
+
+$BackendEnvExample = Join-Path -Path $ProjectRoot -ChildPath "backend\.env.backend.example"
+$BackendEnv = Join-Path -Path $ProjectRoot -ChildPath "backend\.env.backend"
+$FrontendEnvExample = Join-Path -Path $ProjectRoot -ChildPath "frontend\.env.frontend.example"
+$FrontendEnv = Join-Path -Path $ProjectRoot -ChildPath "frontend\.env.frontend"
+
+if (-not (Test-Path $BackendEnv) -and (Test-Path $BackendEnvExample)) {
+    Copy-Item -Path $BackendEnvExample -Destination $BackendEnv
+    Write-Host "Created backend\.env.backend. Please edit it."
+} else { Write-Host "backend\.env.backend already exists or example missing." }
+
+if (-not (Test-Path $FrontendEnv) -and (Test-Path $FrontendEnvExample)) {
+    Copy-Item -Path $FrontendEnvExample -Destination $FrontendEnv
+    Write-Host "Created frontend\.env.frontend. Please review it."
+} else { Write-Host "frontend\.env.frontend already exists or example missing." }
+Write-Host "Edit .env files with specific configurations (SECRET_KEY, DB_PASSWORD, etc.)."
+
+# ----------------------------------
+# END File: scripts\setup_env_files.ps1
+
+
+# File: scripts\start_backend_dev.ps1
+# ------------------------------------
+# start_backend_dev.ps1
+$ProjectRoot = $PSScriptRoot | Split-Path
+$VenvPath = Join-Path -Path $ProjectRoot -ChildPath "venv_backend\Scripts\Activate.ps1"
+$BackendPath = Join-Path -Path $ProjectRoot -ChildPath "backend"
+if (-not (Test-Path $VenvPath)) { Write-Error "Venv not found: $VenvPath"; exit 1 }
+Write-Host "Activating venv..."
+& $VenvPath
+Write-Host "Starting Django development server..."
+Push-Location $BackendPath
+python manage.py runserver
+Pop-Location
+Read-Host -Prompt "Press Enter to exit"
+
+# ------------------------------------
+# END File: scripts\start_backend_dev.ps1
+
+
+# File: scripts\start_backend.ps1
+# --------------------------------
+# start_backend.ps1
+$ProjectRoot = $PSScriptRoot | Split-Path
+$VenvPath = Join-Path -Path $ProjectRoot -ChildPath "venv_backend\Scripts\Activate.ps1"
+$BackendPath = Join-Path -Path $ProjectRoot -ChildPath "backend"
+$BackendEnvFile = Join-Path -Path $BackendPath -ChildPath ".env.backend"
+$BackendPort = "8000" 
+
+if (Test-Path $BackendEnvFile) {
+    Get-Content $BackendEnvFile | ForEach-Object {
+        if ($_ -match "^\s*BACKEND_SERVER_PORT\s*=\s*(.+)") { $BackendPort = $Matches[1].Trim() }
+    }
+} else { Write-Warning ".env.backend not found. Using default port $BackendPort." }
+
+if (-not (Test-Path $VenvPath)) { Write-Error "Venv not found: $VenvPath"; exit 1 }
+Write-Host "Activating venv..."
+& $VenvPath
+Write-Host "Starting Waitress on port $BackendPort for gcagolfapp_backend..."
+Push-Location $BackendPath
+waitress-serve --port=$BackendPort gcagolfapp_backend.wsgi:application
+Pop-Location
+Read-Host -Prompt "Press Enter to exit"
+
+# --------------------------------
+# END File: scripts\start_backend.ps1
+
+
+# File: scripts\start_nginx.bat
+# ------------------------------
+@echo off
+REM start_nginx.bat - Run as Administrator
+SET "PROJECT_BASE_PATH=%~dp0.."
+for %%i in ("%PROJECT_BASE_PATH%") do SET "ABS_PROJECT_PATH=%%~fi"
+SET "NGINX_PREFIX_PATH=%ABS_PROJECT_PATH:\=/%/nginx/"
+
+echo Starting Nginx with prefix: %NGINX_PREFIX_PATH%
+REM Assumes nginx.exe is in PATH. If not, provide full path to nginx.exe
+nginx -p %NGINX_PREFIX_PATH% -c conf/nginx.conf
+
+IF ERRORLEVEL 1 (
+    echo Failed to start Nginx. Check port 80, paths, or run:
+    echo nginx -t -p %NGINX_PREFIX_PATH% -c conf/nginx.conf
+) ELSE (
+    echo Nginx started.
+)
+pause
+
+# ------------------------------
+# END File: scripts\start_nginx.bat
+
+
+# File: scripts\stop_nginx.bat
+# -----------------------------
+@echo off
+REM stop_nginx.bat - Run as Administrator
+SET "PROJECT_BASE_PATH=%~dp0.."
+for %%i in ("%PROJECT_BASE_PATH%") do SET "ABS_PROJECT_PATH=%%~fi"
+SET "NGINX_PREFIX_PATH=%ABS_PROJECT_PATH:\=/%/nginx/"
+
+echo Stopping Nginx with prefix: %NGINX_PREFIX_PATH%
+REM Assumes nginx.exe is in PATH.
+nginx -p %NGINX_PREFIX_PATH% -s stop
+IF ERRORLEVEL 1 (
+    echo Failed to stop Nginx. Maybe not running or try: taskkill /F /IM nginx.exe /T
+) ELSE ( echo Nginx stop signal sent. )
+pause
+
+# -----------------------------
+# END File: scripts\stop_nginx.bat
+
+
+# ===================================
+# END OF SNAPSHOT
+# ===================================

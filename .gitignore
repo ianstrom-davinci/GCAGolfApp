@@ -1,0 +1,50 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+venv_backend/
+venv/
+.env
+.env.*
+!.env.example
+!backend/.env.backend.example
+
+# Django
+db.sqlite3
+db.sqlite3-journal
+staticfiles/ # Django's collectstatic output for admin
+# mediafiles/ # User uploaded files, decide if you want to ignore
+
+# OpenAPI
+# openapi.yaml # Commit if you want version control, or generate on demand
+
+# Node / React
+node_modules/
+frontend/build/
+frontend/.pnp.*
+frontend/coverage/
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/.DS_Store
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+!frontend/.env.frontend.example
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# Nginx logs (if stored locally within project)
+# nginx/logs/
