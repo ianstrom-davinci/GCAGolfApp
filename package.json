@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "@mantine/dates": "^8.0.1",
+    "@mantine/form": "^8.0.1",
+    "@mantine/notifications": "^8.0.1",
+    "@tabler/icons-react": "^3.33.0",
+    "@types/react-dom": "^19.1.5",
+    "mantine-datatable": "^7.17.1",
+    "react-scripts": "^5.0.1",
+    "web-vitals": "^5.0.1"
+  }
+}
