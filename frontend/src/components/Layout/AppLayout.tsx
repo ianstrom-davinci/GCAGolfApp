@@ -1,6 +1,7 @@
 // File: frontend/src/components/Layout/AppLayout.tsx
 // -------------------------------------------------
 import React from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   AppShell,
   Group,
@@ -15,18 +16,38 @@ import {
 import { navigationItems } from '../../utils/constants';
 
 interface AppLayoutProps {
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
   children: React.ReactNode;
 }
 
-export function AppLayout({ activeTab, setActiveTab, children }: AppLayoutProps) {
+export function AppLayout({ children }: AppLayoutProps) {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Get current page from URL
+  const currentPath = location.pathname;
+  const activeTab = currentPath.substring(1) || 'dashboard'; // Remove leading slash
+
+  // Handle navigation
+  const handleNavigation = (value: string) => {
+    navigate(`/${value}`);
+  };
+
+  // Get current page label for breadcrumbs
+  const getCurrentPageLabel = () => {
+    const currentItem = navigationItems.find(item => item.value === activeTab);
+    return currentItem?.label || 'Dashboard';
+  };
+
   const breadcrumbItems = [
-    { title: 'Home', href: '#' },
-    { title: 'GCA Golf App', href: '#' },
-    { title: navigationItems.find(item => item.value === activeTab)?.label || 'Dashboard', href: '#' },
+    { title: 'Home', href: '/' },
+    { title: 'GCA Golf App', href: '/' },
+    { title: getCurrentPageLabel(), href: currentPath },
   ].map((item, index) => (
-    <Anchor href={item.href} key={index}>
+    <Anchor
+      key={index}
+      onClick={() => navigate(item.href)}
+      style={{ cursor: 'pointer' }}
+    >
       {item.title}
     </Anchor>
   ));
@@ -65,19 +86,28 @@ export function AppLayout({ activeTab, setActiveTab, children }: AppLayoutProps)
         <Stack gap="xs">
           {navigationItems.map((item) => {
             const Icon = item.icon;
+            const isActive = activeTab === item.value;
+
             return (
               <NavLink
                 key={item.value}
-                active={activeTab === item.value}
+                active={isActive}
                 label={item.label}
                 leftSection={<Icon size="1rem" />}
-                onClick={() => setActiveTab(item.value)}
+                onClick={() => handleNavigation(item.value)}
                 color="blue"
                 styles={{
                   root: {
                     color: 'white',
+                    cursor: 'pointer',
                     '&:hover': {
                       backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                    },
+                    '&[data-active]': {
+                      backgroundColor: 'rgba(59, 130, 246, 0.3)',
+                      '&:hover': {
+                        backgroundColor: 'rgba(59, 130, 246, 0.4)',
+                      },
                     },
                   },
                   label: {

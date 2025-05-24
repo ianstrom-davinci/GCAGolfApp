@@ -1,9 +1,22 @@
 ﻿// File: frontend/src/App.tsx
 // -------------------------
-import React, { useState } from 'react';
-import { MantineProvider, createTheme, Text } from '@mantine/core';
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { MantineProvider, createTheme } from '@mantine/core';
+import { Notifications } from '@mantine/notifications';
 import { AppLayout } from './components/Layout/AppLayout';
-import { TournamentSystemPage } from './components/Tournament/TournamentSystemPage';
+import { TournamentManagementTab } from './components/Tournament/tabs/TournamentManagementTab';
+import { GroupsManagementTab } from './components/Groups/GroupsManagementTab';
+import { GolfersManagementTab } from './components/Golfers/GolfersManagementTab';
+import { ShotsManagementTab } from './components/Shots/ShotsManagementTab';
+import { SessionsPage } from './components/Sessions/SessionsPage';
+import { DashboardPage } from './components/Dashboard/DashboardPage';
+
+// Import all required CSS
+import '@mantine/core/styles.css';
+import '@mantine/notifications/styles.css';
+import '@mantine/dates/styles.css';
+import 'mantine-datatable/styles.css';
 
 // Custom theme
 const theme = createTheme({
@@ -26,25 +39,28 @@ const theme = createTheme({
 });
 
 function App() {
-  const [activeTab, setActiveTab] = useState('tournament');
-
-  const renderPage = () => {
-    switch (activeTab) {
-      case 'tournament':
-      case 'golfers':
-      case 'shots':
-      case 'tournaments':
-        return <TournamentSystemPage initialTab={activeTab} />;
-      default:
-        return <TournamentSystemPage initialTab="tournament" />;
-    }
-  };
-
   return (
     <MantineProvider theme={theme} defaultColorScheme="light">
-      <AppLayout activeTab={activeTab} setActiveTab={setActiveTab}>
-        {renderPage()}
-      </AppLayout>
+      <Notifications position="bottom-right" zIndex={1000} />
+      <Router>
+        <AppLayout>
+          <Routes>
+            {/* Default route redirects to dashboard */}
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
+            {/* Main application routes */}
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/tournaments" element={<TournamentManagementTab />} />
+            <Route path="/groups" element={<GroupsManagementTab />} />
+            <Route path="/golfers" element={<GolfersManagementTab />} />
+            <Route path="/shots" element={<ShotsManagementTab />} />
+            <Route path="/sessions" element={<SessionsPage />} />
+
+            {/* Catch-all route for 404s */}
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </AppLayout>
+      </Router>
     </MantineProvider>
   );
 }

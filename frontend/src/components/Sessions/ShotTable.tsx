@@ -5,7 +5,7 @@ import { DataTable, DataTableColumn } from 'mantine-datatable';
 import { ActionIcon, Modal, Stack, Text, Group, Button } from '@mantine/core';
 import { IconTrash } from '@tabler/icons-react';
 import { ShotData } from '../../types/golf';
-import { EditableCell } from '../common/EditableCell';
+import { EditableCell } from '../Common/EditableCell';
 
 interface ShotTableProps {
   shots: ShotData[];
