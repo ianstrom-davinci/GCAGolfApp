@@ -1,6 +1,6 @@
 // File: frontend/src/components/Tournament/TournamentForm.tsx
 // --------------------------------------------------------
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   Stack,
   TextInput,
@@ -23,6 +23,15 @@ interface TournamentFormProps {
   loading?: boolean;
 }
 
+interface FormValues {
+  name: string;
+  description: string;
+  start_date: DateValue;
+  end_date: DateValue;
+  location: string;
+  is_active: boolean;
+}
+
 export const TournamentForm: React.FC<TournamentFormProps> = ({
   tournament,
   onSubmit,
@@ -31,14 +40,14 @@ export const TournamentForm: React.FC<TournamentFormProps> = ({
 }) => {
   const isEdit = Boolean(tournament);
 
-  const form = useForm<TournamentCreate>({
+  const form = useForm<FormValues>({
     initialValues: {
-      name: tournament?.name || '',
-      description: tournament?.description || '',
-      start_date: tournament?.start_date || '',
-      end_date: tournament?.end_date || '',
-      location: tournament?.location || '',
-      is_active: tournament?.is_active ?? true,
+      name: '',
+      description: '',
+      start_date: null,
+      end_date: null,
+      location: '',
+      is_active: true,
     },
     validate: {
       name: (value) => {
@@ -74,9 +83,45 @@ export const TournamentForm: React.FC<TournamentFormProps> = ({
     },
   });
 
-  const handleSubmit = async (values: TournamentCreate) => {
+  // Set form values when editing
+  useEffect(() => {
+    if (tournament) {
+      form.setValues({
+        name: tournament.name || '',
+        description: tournament.description || '',
+        start_date: tournament.start_date ? new Date(tournament.start_date) : null,
+        end_date: tournament.end_date ? new Date(tournament.end_date) : null,
+        location: tournament.location || '',
+        is_active: tournament.is_active !== false,
+      });
+    } else {
+      // Reset form for create mode
+      form.setValues({
+        name: '',
+        description: '',
+        start_date: null,
+        end_date: null,
+        location: '',
+        is_active: true,
+      });
+    }
+  }, [tournament]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleSubmit = async (values: FormValues) => {
     try {
-      await onSubmit(values);
+      const submitData: TournamentCreate = {
+        name: values.name,
+        description: values.description || undefined,
+        start_date: values.start_date ?
+          new Date(values.start_date).toISOString().split('T')[0] : '',
+        end_date: values.end_date ?
+          new Date(values.end_date).toISOString().split('T')[0] : '',
+        location: values.location || undefined,
+        is_active: values.is_active,
+      };
+
+      await onSubmit(submitData);
+
       if (!isEdit) {
         form.reset();
       }
@@ -87,24 +132,16 @@ export const TournamentForm: React.FC<TournamentFormProps> = ({
   };
 
   const handleStartDateChange = (date: DateValue) => {
-  const dateString = date instanceof Date ? date.toISOString().split('T')[0] : '';
-    form.setFieldValue('start_date', dateString);
+    form.setFieldValue('start_date', date);
 
     // If end date is before new start date, clear it
-    if (form.values.end_date && dateString && new Date(form.values.end_date) < new Date(dateString)) {
-      form.setFieldValue('end_date', '');
+    if (form.values.end_date && date && new Date(form.values.end_date) < new Date(date)) {
+      form.setFieldValue('end_date', null);
     }
   };
 
   const handleEndDateChange = (date: DateValue) => {
-    const dateString = date instanceof Date ? date.toISOString().split('T')[0] : '';
-    form.setFieldValue('end_date', dateString);
-  };
-
-  const parseDate = (dateString: string): Date | null => {
-    if (!dateString) return null;
-    const date = new Date(dateString);
-    return isNaN(date.getTime()) ? null : date;
+    form.setFieldValue('end_date', date);
   };
 
   return (
@@ -146,7 +183,7 @@ export const TournamentForm: React.FC<TournamentFormProps> = ({
             label="Start Date"
             placeholder="Select start date"
             required
-            value={parseDate(form.values.start_date || '')}
+            value={form.values.start_date}
             onChange={handleStartDateChange}
             error={form.errors.start_date}
             disabled={loading}
@@ -157,12 +194,12 @@ export const TournamentForm: React.FC<TournamentFormProps> = ({
             label="End Date"
             placeholder="Select end date"
             required
-            value={parseDate(form.values.end_date)}
+            value={form.values.end_date}
             onChange={handleEndDateChange}
             error={form.errors.end_date}
             disabled={loading}
             clearable
-            minDate={form.values.start_date ? parseDate(form.values.start_date) || undefined : undefined}
+            minDate={form.values.start_date ? new Date(form.values.start_date) : undefined}
           />
         </Group>
 

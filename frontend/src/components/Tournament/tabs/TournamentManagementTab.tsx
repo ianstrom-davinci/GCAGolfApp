@@ -73,7 +73,7 @@ export const TournamentManagementTab: React.FC = () => {
       });
       setSelectedTournaments([]);
     } else if (deleteModal.tournament) {
-      await deleteTournament(deleteModal.tournament.id);
+      await deleteTournament(deleteModal.tournament.id, deleteChildren);
     }
     setDeleteModal({ opened: false });
   };
@@ -143,7 +143,7 @@ export const TournamentManagementTab: React.FC = () => {
         type="delete"
         loading={loading}
         showChildrenOption={showChildrenOption}
-        childrenLabel="Also delete all groups and golfers in these tournaments"
+        childrenLabel="Also delete all groups, golfers, and shots in these tournaments"
         itemCount={deleteModal.bulk ? selectedTournaments.length : 1}
       />
     </Stack>

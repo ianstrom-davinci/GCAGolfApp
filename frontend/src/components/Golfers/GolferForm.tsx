@@ -20,7 +20,6 @@ import { DateValue } from '@mantine/dates';
 import { IconAlertCircle, IconUser, IconGolf } from '@tabler/icons-react';
 import { Golfer, GolferCreate } from '../../types';
 import { useGroups } from '../../hooks/useGroups';
-import { useTournaments } from '../../hooks/useTournaments';
 
 interface GolferFormProps {
   golfer?: Golfer;
@@ -54,7 +53,6 @@ export function GolferForm({
   preselectedGroup
 }: GolferFormProps) {
   const { groups } = useGroups();
-  const { tournaments } = useTournaments();
   const [availableGroups, setAvailableGroups] = useState<any[]>([]);
 
   const form = useForm<FormValues>({
@@ -69,7 +67,7 @@ export function GolferForm({
       handicap: '',
       skill_level: 'intermediate',
       preferred_tee: '',
-      group: preselectedGroup ? preselectedGroup.toString() : '',
+      group: '',
       is_active: true,
       notes: '',
     },
@@ -130,23 +128,7 @@ export function GolferForm({
     },
   });
 
-  // Update available groups when groups change
-  useEffect(() => {
-    const groupOptions = groups
-      .filter(group => !group.is_full || (golfer && golfer.group === group.id))
-      .map(group => ({
-        value: group.id.toString(),
-        label: `${group.display_name} - ${group.current_golfer_count}/${group.max_golfers} golfers`,
-        disabled: group.is_full && (!golfer || golfer.group !== group.id)
-      }));
-
-    setAvailableGroups([
-      { value: '', label: 'No group assigned' },
-      ...groupOptions
-    ]);
-  }, [groups, golfer]);
-
-  // Set form values when editing
+  // Reset form when golfer changes (for edit mode)
   useEffect(() => {
     if (golfer) {
       form.setValues({
@@ -164,10 +146,42 @@ export function GolferForm({
         is_active: golfer.is_active !== false,
         notes: golfer.notes || '',
       });
-    } else if (preselectedGroup) {
-      form.setFieldValue('group', preselectedGroup.toString());
+    } else {
+      // Reset to initial values for create mode
+      form.setValues({
+        golfer_id: '',
+        first_name: '',
+        last_name: '',
+        email: '',
+        phone: '',
+        date_of_birth: null,
+        gender: '',
+        handicap: '',
+        skill_level: 'intermediate',
+        preferred_tee: '',
+        group: preselectedGroup ? preselectedGroup.toString() : '',
+        is_active: true,
+        notes: '',
+      });
     }
-  }, [golfer, preselectedGroup, form]);
+    form.clearErrors();
+  }, [golfer?.id, preselectedGroup]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Update available groups when groups change
+  useEffect(() => {
+    const groupOptions = groups
+      .filter(group => !group.is_full || (golfer && golfer.group === group.id))
+      .map(group => ({
+        value: group.id.toString(),
+        label: `${group.display_name} - ${group.current_golfer_count}/${group.max_golfers} golfers`,
+        disabled: group.is_full && (!golfer || golfer.group !== group.id)
+      }));
+
+    setAvailableGroups([
+      { value: '', label: 'No group assigned' },
+      ...groupOptions
+    ]);
+  }, [groups, golfer]);
 
   // Auto-generate golfer ID function
   const generateGolferId = (firstName: string, lastName: string) => {
@@ -178,8 +192,8 @@ export function GolferForm({
   };
 
   const handleSubmit = async (values: FormValues) => {
-    // Auto-generate golfer_id if empty
-    const finalGolferId = values.golfer_id || generateGolferId(values.first_name, values.last_name);
+    // Auto-generate golfer_id if empty and not editing
+    const finalGolferId = values.golfer_id || (golfer?.golfer_id) || generateGolferId(values.first_name, values.last_name);
 
     const submitData: GolferCreate = {
       golfer_id: finalGolferId,
@@ -200,11 +214,16 @@ export function GolferForm({
 
     try {
       await onSubmit(submitData);
-      form.reset();
+      // Don't reset form here - let the parent component handle modal closing
     } catch (error) {
       // Error handling is done by the parent component
       console.error('Error submitting golfer:', error);
     }
+  };
+
+  const handleCancel = () => {
+    form.reset();
+    onCancel();
   };
 
   return (
@@ -357,7 +376,7 @@ export function GolferForm({
 
         {/* Form Actions */}
         <Group justify="flex-end" gap="md" pt="md">
-          <Button variant="outline" onClick={onCancel} disabled={loading}>
+          <Button variant="outline" onClick={handleCancel} disabled={loading}>
             Cancel
           </Button>
           <Button type="submit" loading={loading}>

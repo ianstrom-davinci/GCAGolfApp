@@ -81,17 +81,32 @@ export const useTournaments = () => {
     }
   }, []);
 
-  const deleteTournament = useCallback(async (id: number): Promise<boolean> => {
+  const deleteTournament = useCallback(async (id: number, deleteChildren: boolean = false): Promise<boolean> => {
     setLoading(true);
     setError(null);
     try {
-      await apiService.deleteTournament(id);
-      setTournaments(prev => prev.filter(t => t.id !== id));
-      notifications.show({
-        title: 'Success',
-        message: 'Tournament deleted successfully',
-        color: 'green',
-      });
+      if (deleteChildren) {
+        // Use bulk delete for single tournament when deleting children
+        const response = await apiService.bulkDeleteTournaments({
+          ids: [id],
+          delete_children: deleteChildren,
+        });
+        setTournaments(prev => prev.filter(t => t.id !== id));
+        notifications.show({
+          title: 'Success',
+          message: response.message,
+          color: 'green',
+        });
+      } else {
+        // Use regular delete when not deleting children
+        await apiService.deleteTournament(id);
+        setTournaments(prev => prev.filter(t => t.id !== id));
+        notifications.show({
+          title: 'Success',
+          message: 'Tournament deleted successfully',
+          color: 'green',
+        });
+      }
       return true;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete tournament';

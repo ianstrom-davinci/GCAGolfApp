@@ -44,7 +44,31 @@ class ApiService {
         throw new Error(`HTTP ${response.status}: ${errorData}`);
       }
 
-      return await response.json();
+      // Check if response has content to parse
+      const contentType = response.headers.get('content-type');
+      const contentLength = response.headers.get('content-length');
+
+      // If it's a DELETE request or empty response, don't try to parse JSON
+      if (
+        response.status === 204 || // No Content
+        contentLength === '0' ||
+        (!contentType?.includes('application/json'))
+      ) {
+        return {} as T; // Return empty object for void responses
+      }
+
+      // Check if response body is empty
+      const text = await response.text();
+      if (!text.trim()) {
+        return {} as T; // Return empty object for empty responses
+      }
+
+      try {
+        return JSON.parse(text);
+      } catch (parseError) {
+        console.warn('Failed to parse JSON response:', text);
+        return {} as T; // Return empty object if JSON parsing fails
+      }
     } catch (error) {
       console.error(`API Error for ${url}:`, error);
       throw error;
@@ -85,7 +109,7 @@ class ApiService {
   }
 
   async deleteTournament(id: number): Promise<void> {
-    return this.fetchWithError<void>(`/tournaments/${id}/`, {
+    await this.fetchWithError<void>(`/tournaments/${id}/`, {
       method: 'DELETE',
     });
   }
@@ -126,7 +150,7 @@ class ApiService {
   }
 
   async deleteGroup(id: number): Promise<void> {
-    return this.fetchWithError<void>(`/groups/${id}/`, {
+    await this.fetchWithError<void>(`/groups/${id}/`, {
       method: 'DELETE',
     });
   }
@@ -189,7 +213,7 @@ class ApiService {
   }
 
   async deleteGolfer(id: number): Promise<void> {
-    return this.fetchWithError<void>(`/golfers/${id}/`, {
+    await this.fetchWithError<void>(`/golfers/${id}/`, {
       method: 'DELETE',
     });
   }
@@ -239,7 +263,7 @@ class ApiService {
   }
 
   async deleteShot(id: number): Promise<void> {
-    return this.fetchWithError<void>(`/shots/${id}/`, {
+    await this.fetchWithError<void>(`/shots/${id}/`, {
       method: 'DELETE',
     });
   }

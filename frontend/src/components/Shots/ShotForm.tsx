@@ -20,6 +20,7 @@ import { useForm } from '@mantine/form';
 import { IconAlertCircle, IconTarget, IconClock, IconRuler } from '@tabler/icons-react';
 import { Shot, ShotCreate } from '../../types';
 import { useGolfers } from '../../hooks/useGolfers';
+import { useShots } from '../../hooks/useShots';
 import { SHOT_TYPES, CLUBS } from '../../utils/constants';
 
 interface ShotFormProps {
@@ -39,10 +40,25 @@ export const ShotForm: React.FC<ShotFormProps> = ({
 }) => {
   const isEdit = Boolean(shot);
   const { golfers } = useGolfers();
+  const { shots } = useShots(); // Get existing shots to determine next shot number
+
+  // Auto-generate shot number
+  const generateShotNumber = (golferId?: number) => {
+    if (!golferId) return 1;
+
+    // Find the highest shot number for this golfer
+    const golferShots = shots.filter(s => s.golfer === golferId);
+    const maxShotNumber = golferShots.length > 0
+      ? Math.max(...golferShots.map(s => s.shot_number))
+      : 0;
+
+    return maxShotNumber + 1;
+  };
 
   const form = useForm<ShotCreate>({
     initialValues: {
       golfer: shot?.golfer || preselectedGolfer || undefined,
+      shot_number: shot?.shot_number || 1,
       hole_number: shot?.hole_number || undefined,
       shot_type: shot?.shot_type || 'drive',
       club_used: shot?.club_used || '',
@@ -62,6 +78,12 @@ export const ShotForm: React.FC<ShotFormProps> = ({
       golfer: (value) => {
         if (!value) {
           return 'Please select a golfer';
+        }
+        return null;
+      },
+      shot_number: (value) => {
+        if (!value || value < 1) {
+          return 'Shot number must be 1 or greater';
         }
         return null;
       },
@@ -136,17 +158,37 @@ export const ShotForm: React.FC<ShotFormProps> = ({
   useEffect(() => {
     if (preselectedGolfer && !isEdit) {
       form.setFieldValue('golfer', preselectedGolfer);
+      // Auto-generate shot number for this golfer
+      const nextShotNumber = generateShotNumber(preselectedGolfer);
+      form.setFieldValue('shot_number', nextShotNumber);
     }
-  }, [preselectedGolfer, isEdit, form]);
+  }, [preselectedGolfer, isEdit]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Update shot number when golfer changes
+  const handleGolferChange = (golferId: number | undefined) => {
+    form.setFieldValue('golfer', golferId);
+    if (golferId && !isEdit) {
+      const nextShotNumber = generateShotNumber(golferId);
+      form.setFieldValue('shot_number', nextShotNumber);
+    }
+  };
 
   const handleSubmit = async (values: ShotCreate) => {
     try {
-      await onSubmit(values);
+      // Ensure shot_number is set
+      const submitData: ShotCreate = {
+        ...values,
+        shot_number: values.shot_number || generateShotNumber(values.golfer),
+      };
+
+      await onSubmit(submitData);
+
       if (!isEdit) {
         form.reset();
         // Keep golfer selection if it was preselected
         if (preselectedGolfer) {
           form.setFieldValue('golfer', preselectedGolfer);
+          form.setFieldValue('shot_number', generateShotNumber(preselectedGolfer));
         }
         form.setFieldValue('shot_type', 'drive');
         form.setFieldValue('is_simulated', false);
@@ -211,7 +253,7 @@ export const ShotForm: React.FC<ShotFormProps> = ({
                 data={golferOptions}
                 value={form.values.golfer?.toString() || ''}
                 onChange={(value) => {
-                  form.setFieldValue('golfer', value ? parseInt(value) : undefined);
+                  handleGolferChange(value ? parseInt(value) : undefined);
                 }}
                 disabled={loading}
                 searchable
@@ -219,9 +261,20 @@ export const ShotForm: React.FC<ShotFormProps> = ({
                 error={form.errors.golfer}
               />
             </Grid.Col>
-            <Grid.Col span={3}>
+            <Grid.Col span={2}>
               <NumberInput
-                label="Hole Number"
+                label="Shot #"
+                placeholder="1"
+                min={1}
+                max={999}
+                {...form.getInputProps('shot_number')}
+                disabled={loading}
+                description="Auto-generated"
+              />
+            </Grid.Col>
+            <Grid.Col span={2}>
+              <NumberInput
+                label="Hole #"
                 placeholder="1-18"
                 min={1}
                 max={18}
@@ -229,10 +282,10 @@ export const ShotForm: React.FC<ShotFormProps> = ({
                 disabled={loading}
               />
             </Grid.Col>
-            <Grid.Col span={3}>
+            <Grid.Col span={2}>
               <DateTimePicker
-                label="Timestamp"
-                placeholder="Select date and time"
+                label="Time"
+                placeholder="Now"
                 value={form.values.timestamp ? new Date(form.values.timestamp) : new Date()}
                 onChange={(date) => {
                   const timestamp = new Date(date || new Date()).toISOString();

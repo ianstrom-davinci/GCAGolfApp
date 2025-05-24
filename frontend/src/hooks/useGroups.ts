@@ -101,17 +101,32 @@ export const useGroups = (tournamentId?: number) => {
     }
   }, []);
 
-  const deleteGroup = useCallback(async (id: number): Promise<boolean> => {
+  const deleteGroup = useCallback(async (id: number, deleteChildren: boolean = false): Promise<boolean> => {
     setLoading(true);
     setError(null);
     try {
-      await apiService.deleteGroup(id);
-      setGroups(prev => prev.filter(g => g.id !== id));
-      notifications.show({
-        title: 'Success',
-        message: 'Group deleted successfully',
-        color: 'green',
-      });
+      if (deleteChildren) {
+        // Use bulk delete for single group when deleting children
+        const response = await apiService.bulkDeleteGroups({
+          ids: [id],
+          delete_children: deleteChildren,
+        });
+        setGroups(prev => prev.filter(g => g.id !== id));
+        notifications.show({
+          title: 'Success',
+          message: response.message,
+          color: 'green',
+        });
+      } else {
+        // Use regular delete when not deleting children
+        await apiService.deleteGroup(id);
+        setGroups(prev => prev.filter(g => g.id !== id));
+        notifications.show({
+          title: 'Success',
+          message: 'Group deleted successfully',
+          color: 'green',
+        });
+      }
       return true;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete group';

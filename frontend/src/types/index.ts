@@ -130,6 +130,7 @@ export interface Shot {
 
 export interface ShotCreate {
   golfer?: number;
+  shot_number?: number;  // Add this - backend should auto-generate if not provided
   hole_number?: number;
   shot_type?: 'drive' | 'approach' | 'chip' | 'putt' | 'bunker' | 'other';
   club_used?: string;

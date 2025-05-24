@@ -1,6 +1,6 @@
 // File: frontend/src/components/Groups/GroupsManagementTab.tsx
 // -----------------------------------------------------------
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Card,
   Title,
@@ -8,324 +8,130 @@ import {
   Table,
   Group,
   Stack,
-  Modal,
-  TextInput,
-  Select,
   ActionIcon,
   Badge,
   Text,
   Alert,
-  Loader
+  Loader,
+  Select,
 } from '@mantine/core';
-import { notifications } from '@mantine/notifications';
 import {
   IconPlus,
   IconEdit,
   IconTrash,
   IconAlertTriangle,
-  IconClock,
-  IconCheck,
-  IconX
 } from '@tabler/icons-react';
-
-interface Tournament {
-  id: number;
-  name: string;
-  is_active: boolean;
-}
-
-interface GroupData {
-  id: number;
-  tournament: number;
-  tournament_name: string;
-  nickname: string | null;
-  group_number: number;
-  current_golfer_count: number;
-  max_golfers: number;
-  display_name: string;
-}
+import { GroupModal } from './GroupModal';
+import { ConfirmationModal } from '../Common/ConfirmationModal';
+import { useGroups } from '../../hooks/useGroups';
+import { useTournaments } from '../../hooks/useTournaments';
+import { Group as GroupType, GroupCreate } from '../../types';
 
 export const GroupsManagementTab: React.FC = () => {
-  const [groups, setGroups] = useState<GroupData[]>([]);
-  const [tournaments, setTournaments] = useState<Tournament[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [tournamentsLoading, setTournamentsLoading] = useState(true);
+  const { tournaments, loading: tournamentsLoading } = useTournaments();
+  const [selectedTournament, setSelectedTournament] = useState<number | undefined>(undefined);
+  const {
+    groups,
+    loading,
+    createGroup,
+    updateGroup,
+    deleteGroup,
+    bulkDeleteGroups,
+    fetchGroups,
+  } = useGroups(selectedTournament);
 
-  // Modal states
-  const [createModal, setCreateModal] = useState(false);
-  const [editModal, setEditModal] = useState(false);
-  const [deleteModal, setDeleteModal] = useState(false);
-  const [selectedGroup, setSelectedGroup] = useState<GroupData | null>(null);
-
-  // Form state
-  const [formData, setFormData] = useState({
-    tournament: '',
-    nickname: '',
-    max_golfers: '4'
+  const [selectedGroups, setSelectedGroups] = useState<GroupType[]>([]);
+  const [modalState, setModalState] = useState<{
+    opened: boolean;
+    group?: GroupType;
+  }>({
+    opened: false,
+  });
+  const [deleteModal, setDeleteModal] = useState<{
+    opened: boolean;
+    group?: GroupType;
+    bulk?: boolean;
+  }>({
+    opened: false,
   });
 
-  // Filters
-  const [selectedTournament, setSelectedTournament] = useState<string | null>(null);
+  // Modal handlers
+  const handleCreate = () => {
+    setModalState({ opened: true });
+  };
 
-  useEffect(() => {
-    fetchTournaments();
-  }, []);
+  const handleEdit = (group: GroupType) => {
+    setModalState({ opened: true, group });
+  };
 
-  useEffect(() => {
-    if (!tournamentsLoading) {
-      fetchGroups();
-    }
-  }, [selectedTournament, tournamentsLoading]);
+  const handleModalClose = () => {
+    setModalState({ opened: false });
+  };
 
-  const fetchTournaments = async () => {
-    setTournamentsLoading(true);
-    try {
-      const response = await fetch('http://localhost:8000/api/tournaments/');
-      const data = await response.json();
-      console.log('Tournaments API response:', data); // Debug log
-      setTournaments(data.results || []);
-    } catch (error) {
-      console.error('Error fetching tournaments:', error);
-      setTournaments([]);
-      notifications.show({
-        title: 'Error',
-        message: 'Failed to load tournaments',
-        color: 'red',
-        icon: <IconX size={16} />,
-      });
-    } finally {
-      setTournamentsLoading(false);
+  const handleModalSubmit = async (data: GroupCreate) => {
+    if (modalState.group) {
+      await updateGroup(modalState.group.id, data);
+    } else {
+      await createGroup(data);
     }
   };
 
-  const fetchGroups = async () => {
-    setLoading(true);
-    try {
-      const url = new URL('http://localhost:8000/api/groups/');
-      if (selectedTournament) {
-        url.searchParams.append('tournament_id', selectedTournament);
-      }
+  // Delete handlers
+  const handleDelete = (group: GroupType) => {
+    setDeleteModal({ opened: true, group });
+  };
 
-      const response = await fetch(url.toString());
-      const data = await response.json();
-      setGroups(data.results || []);
-    } catch (error) {
-      console.error('Error fetching groups:', error);
-      setGroups([]);
-      notifications.show({
-        title: 'Error',
-        message: 'Failed to load groups',
-        color: 'red',
-        icon: <IconX size={16} />,
+  const handleBulkDelete = (groups: GroupType[]) => {
+    setSelectedGroups(groups);
+    setDeleteModal({ opened: true, bulk: true });
+  };
+
+  const handleDeleteConfirm = async (deleteChildren: boolean) => {
+    if (deleteModal.bulk) {
+      await bulkDeleteGroups({
+        ids: selectedGroups.map(g => g.id),
+        delete_children: deleteChildren,
       });
-    } finally {
-      setLoading(false);
+      setSelectedGroups([]);
+    } else if (deleteModal.group) {
+      await deleteGroup(deleteModal.group.id, deleteChildren);
     }
+    setDeleteModal({ opened: false });
   };
 
-  const createGroup = async () => {
-    setLoading(true);
-    try {
-      const groupData = {
-        tournament: parseInt(formData.tournament),
-        nickname: formData.nickname || null,
-        max_golfers: parseInt(formData.max_golfers)
-      };
+  const handleDeleteCancel = () => {
+    setDeleteModal({ opened: false });
+  };
 
-      const response = await fetch('http://localhost:8000/api/groups/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(groupData)
-      });
-
-      if (response.ok) {
-        // Close modal and reset form
-        setCreateModal(false);
-        resetForm();
-
-        // Refresh groups list
-        await fetchGroups();
-
-        // Show success notification
-        notifications.show({
-          title: 'Success',
-          message: 'Group created successfully!',
-          color: 'green',
-          icon: <IconCheck size={16} />,
-          autoClose: 3000,
-        });
-      } else {
-        const errorData = await response.json();
-        notifications.show({
-          title: 'Error',
-          message: `Failed to create group: ${JSON.stringify(errorData)}`,
-          color: 'red',
-          icon: <IconX size={16} />,
-          autoClose: 5000,
-        });
-      }
-    } catch (error) {
-      console.error('Error creating group:', error);
-      notifications.show({
-        title: 'Error',
-        message: 'An unexpected error occurred while creating the group',
-        color: 'red',
-        icon: <IconX size={16} />,
-        autoClose: 5000,
-      });
-    } finally {
-      setLoading(false);
+  const getDeleteMessage = () => {
+    if (deleteModal.bulk) {
+      return `Are you sure you want to delete ${selectedGroups.length} groups?`;
+    } else if (deleteModal.group) {
+      return `Are you sure you want to delete "${deleteModal.group.display_name}"?`;
     }
+    return '';
   };
 
-  const updateGroup = async () => {
-    if (!selectedGroup) return;
-
-    setLoading(true);
-    try {
-      const groupData = {
-        tournament: parseInt(formData.tournament),
-        nickname: formData.nickname || null,
-        max_golfers: parseInt(formData.max_golfers)
-      };
-
-      const response = await fetch(`http://localhost:8000/api/groups/${selectedGroup.id}/`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(groupData)
-      });
-
-      if (response.ok) {
-        // Close modal and reset form
-        setEditModal(false);
-        setSelectedGroup(null);
-        resetForm();
-
-        // Refresh groups list
-        await fetchGroups();
-
-        // Show success notification
-        notifications.show({
-          title: 'Success',
-          message: 'Group updated successfully!',
-          color: 'green',
-          icon: <IconCheck size={16} />,
-          autoClose: 3000,
-        });
-      } else {
-        const errorData = await response.json();
-        notifications.show({
-          title: 'Error',
-          message: `Failed to update group: ${JSON.stringify(errorData)}`,
-          color: 'red',
-          icon: <IconX size={16} />,
-          autoClose: 5000,
-        });
-      }
-    } catch (error) {
-      console.error('Error updating group:', error);
-      notifications.show({
-        title: 'Error',
-        message: 'An unexpected error occurred while updating the group',
-        color: 'red',
-        icon: <IconX size={16} />,
-        autoClose: 5000,
-      });
-    } finally {
-      setLoading(false);
+  const getDeleteTitle = () => {
+    if (deleteModal.bulk) {
+      return 'Delete Multiple Groups';
     }
+    return 'Delete Group';
   };
 
-  const deleteGroup = async () => {
-    if (!selectedGroup) return;
+  const showChildrenOption = deleteModal.group
+    ? deleteModal.group.current_golfer_count > 0
+    : selectedGroups.some(g => g.current_golfer_count > 0);
 
-    setLoading(true);
-    try {
-      const response = await fetch(`http://localhost:8000/api/groups/${selectedGroup.id}/`, {
-        method: 'DELETE'
-      });
-
-      if (response.ok) {
-        // Close modal
-        setDeleteModal(false);
-        setSelectedGroup(null);
-
-        // Refresh groups list
-        await fetchGroups();
-
-        // Show success notification
-        notifications.show({
-          title: 'Success',
-          message: 'Group deleted successfully!',
-          color: 'green',
-          icon: <IconCheck size={16} />,
-          autoClose: 3000,
-        });
-      } else {
-        notifications.show({
-          title: 'Error',
-          message: 'Failed to delete group',
-          color: 'red',
-          icon: <IconX size={16} />,
-          autoClose: 5000,
-        });
-      }
-    } catch (error) {
-      console.error('Error deleting group:', error);
-      notifications.show({
-        title: 'Error',
-        message: 'An unexpected error occurred while deleting the group',
-        color: 'red',
-        icon: <IconX size={16} />,
-        autoClose: 5000,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      tournament: '',
-      nickname: '',
-      max_golfers: '4'
-    });
-  };
-
-  const openEditModal = (group: GroupData) => {
-    setSelectedGroup(group);
-    setFormData({
-      tournament: group.tournament.toString(),
-      nickname: group.nickname || '',
-      max_golfers: group.max_golfers.toString()
-    });
-    setEditModal(true);
-  };
-
-  const openDeleteModal = (group: GroupData) => {
-    setSelectedGroup(group);
-    setDeleteModal(true);
-  };
-
+  // Tournament filter options
   const tournamentOptions = tournaments.map(t => ({
     value: t.id.toString(),
-    label: t.name
+    label: t.name,
   }));
 
   const filterOptions = [
     { value: '', label: 'All Tournaments' },
-    ...tournamentOptions
-  ];
-
-  const maxGolfersOptions = [
-    { value: '1', label: '1 Golfer' },
-    { value: '2', label: '2 Golfers (Twosome)' },
-    { value: '3', label: '3 Golfers (Threesome)' },
-    { value: '4', label: '4 Golfers (Foursome)' },
-    { value: '5', label: '5 Golfers' },
-    { value: '6', label: '6 Golfers' },
-    { value: '7', label: '7 Golfers' },
-    { value: '8', label: '8 Golfers' },
+    ...tournamentOptions,
   ];
 
   // Show loading state while fetching tournaments
@@ -345,7 +151,7 @@ export const GroupsManagementTab: React.FC = () => {
         <Title order={2}>Groups Management</Title>
         <Button
           leftSection={<IconPlus size={16} />}
-          onClick={() => setCreateModal(true)}
+          onClick={handleCreate}
           disabled={tournaments.length === 0}
         >
           Create Group
@@ -366,8 +172,8 @@ export const GroupsManagementTab: React.FC = () => {
             <Select
               placeholder="All Tournaments"
               data={filterOptions}
-              value={selectedTournament}
-              onChange={setSelectedTournament}
+              value={selectedTournament?.toString() || ''}
+              onChange={(value) => setSelectedTournament(value ? parseInt(value) : undefined)}
               style={{ minWidth: 200 }}
             />
           </Group>
@@ -392,7 +198,7 @@ export const GroupsManagementTab: React.FC = () => {
                 <Table.Td>
                   <Text fw={500}>{group.display_name}</Text>
                 </Table.Td>
-                <Table.Td>{group.tournament_name}</Table.Td>
+                <Table.Td>{group.tournament_name || 'Unassigned'}</Table.Td>
                 <Table.Td>
                   <Badge variant="outline" color="blue">
                     {group.max_golfers} max
@@ -411,14 +217,14 @@ export const GroupsManagementTab: React.FC = () => {
                     <ActionIcon
                       variant="subtle"
                       color="blue"
-                      onClick={() => openEditModal(group)}
+                      onClick={() => handleEdit(group)}
                     >
                       <IconEdit size={16} />
                     </ActionIcon>
                     <ActionIcon
                       variant="subtle"
                       color="red"
-                      onClick={() => openDeleteModal(group)}
+                      onClick={() => handleDelete(group)}
                     >
                       <IconTrash size={16} />
                     </ActionIcon>
@@ -434,150 +240,39 @@ export const GroupsManagementTab: React.FC = () => {
             No groups found. Create your first group!
           </Text>
         )}
+
+        {loading && (
+          <Stack align="center" py="xl">
+            <Loader size="sm" />
+            <Text size="sm" c="dimmed">Loading groups...</Text>
+          </Stack>
+        )}
       </Card>
 
-      {/* Create Group Modal */}
-      <Modal
-        opened={createModal}
-        onClose={() => {
-          setCreateModal(false);
-          resetForm();
-        }}
-        title="Create New Group"
-        size="md"
-      >
-        <Stack gap="md">
-          <Select
-            label="Tournament"
-            placeholder="Select tournament"
-            data={tournamentOptions}
-            value={formData.tournament}
-            onChange={(value) => setFormData({...formData, tournament: value || ''})}
-            required
-          />
-          <TextInput
-            label="Group Nickname (Optional)"
-            placeholder="e.g., Smith Foursome, Morning Group"
-            value={formData.nickname}
-            onChange={(e) => setFormData({...formData, nickname: e.target.value})}
-          />
-          <Select
-            label="Maximum Golfers"
-            data={maxGolfersOptions}
-            value={formData.max_golfers}
-            onChange={(value) => setFormData({...formData, max_golfers: value || '4'})}
-            required
-          />
-          <Group justify="flex-end" gap="md">
-            <Button
-              variant="outline"
-              onClick={() => setCreateModal(false)}
-              disabled={loading}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={createGroup}
-              disabled={!formData.tournament || loading}
-              loading={loading}
-            >
-              Create Group
-            </Button>
-          </Group>
-        </Stack>
-      </Modal>
-
-      {/* Edit Group Modal */}
-      <Modal
-        opened={editModal}
-        onClose={() => {
-          setEditModal(false);
-          setSelectedGroup(null);
-          resetForm();
-        }}
-        title="Edit Group"
-        size="md"
-      >
-        <Stack gap="md">
-          <Select
-            label="Tournament"
-            data={tournamentOptions}
-            value={formData.tournament}
-            onChange={(value) => setFormData({...formData, tournament: value || ''})}
-            required
-          />
-          <TextInput
-            label="Group Nickname (Optional)"
-            placeholder="e.g., Smith Foursome, Morning Group"
-            value={formData.nickname}
-            onChange={(e) => setFormData({...formData, nickname: e.target.value})}
-          />
-          <Select
-            label="Maximum Golfers"
-            data={maxGolfersOptions}
-            value={formData.max_golfers}
-            onChange={(value) => setFormData({...formData, max_golfers: value || '4'})}
-            required
-          />
-          <Group justify="flex-end" gap="md">
-            <Button
-              variant="outline"
-              onClick={() => setEditModal(false)}
-              disabled={loading}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={updateGroup}
-              disabled={loading}
-              loading={loading}
-            >
-              Update Group
-            </Button>
-          </Group>
-        </Stack>
-      </Modal>
+      {/* Create/Edit Modal */}
+      <GroupModal
+        opened={modalState.opened}
+        onClose={handleModalClose}
+        group={modalState.group}
+        onSubmit={handleModalSubmit}
+        loading={loading}
+        preselectedTournament={selectedTournament}
+      />
 
       {/* Delete Confirmation Modal */}
-      <Modal
-        opened={deleteModal}
-        onClose={() => {
-          setDeleteModal(false);
-          setSelectedGroup(null);
-        }}
-        title="Delete Group"
-        size="md"
-      >
-        <Stack gap="md">
-          <Group gap="md">
-            <IconAlertTriangle size={24} color="red" />
-            <div>
-              <Text fw={500}>Are you sure you want to delete this group?</Text>
-              <Text size="sm" c="dimmed">
-                This will permanently delete "{selectedGroup?.display_name}" and all associated golfers and shot data.
-              </Text>
-            </div>
-          </Group>
-
-          <Group justify="flex-end" gap="md">
-            <Button
-              variant="outline"
-              onClick={() => setDeleteModal(false)}
-              disabled={loading}
-            >
-              Cancel
-            </Button>
-            <Button
-              color="red"
-              onClick={deleteGroup}
-              disabled={loading}
-              loading={loading}
-            >
-              Delete Group
-            </Button>
-          </Group>
-        </Stack>
-      </Modal>
+      <ConfirmationModal
+        opened={deleteModal.opened}
+        onClose={handleDeleteCancel}
+        onConfirm={handleDeleteConfirm}
+        title={getDeleteTitle()}
+        message={getDeleteMessage()}
+        confirmLabel="Delete"
+        type="delete"
+        loading={loading}
+        showChildrenOption={showChildrenOption}
+        childrenLabel="Also delete all golfers and shots in these groups"
+        itemCount={deleteModal.bulk ? selectedGroups.length : 1}
+      />
     </Stack>
   );
 };

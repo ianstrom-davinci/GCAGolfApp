@@ -105,7 +105,7 @@ export const GolfersManagementTab: React.FC = () => {
       });
       setSelectedGolfers([]);
     } else if (deleteModal.golfer) {
-      await deleteGolfer(deleteModal.golfer.id);
+      await deleteGolfer(deleteModal.golfer.id, deleteChildren);
     }
     setDeleteModal({ opened: false });
   };
